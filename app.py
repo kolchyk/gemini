@@ -22,7 +22,7 @@ st.set_page_config(
 with st.container():
     st.title("🎨 Gemini Image Generator")
     st.markdown("Завантажте одне або кілька референсних зображень та введіть промпт для генерації нового зображення")
-    st.spacer(height=2)
+    st.markdown("<br><br>", unsafe_allow_html=True)
 
 # Prompt templates
 PROMPT_WOMEN = """Keep the facial features of the person in the uploaded image exactly consistent. Dress her in a professional, **fitted black business suit (blazer) with a crisp white blouse**. Background: Place the subject against a clean, solid dark gray studio photography backdrop. The background should have a subtle gradient, slightly lighter behind the subject and darker towards the edges (vignette effect). There should be no other objects. Photography Style: Shot on a Sony A7III with an 85mm f/1.4 lens, creating a flattering portrait compression. Lighting: Use a classic three-point lighting setup. The main key light should create soft, defining shadows on the face. A subtle rim light should separate the subject's shoulders and hair from the dark background. Crucial Details: Render natural skin texture with visible pores, not an airbrushed look. Add natural catchlights to the eyes. The fabric of the suit should show a subtle wool texture. Final image should be an ultra-realistic, 8k professional headshot."""
@@ -109,7 +109,7 @@ with st.container():
     # Display uploaded reference images immediately
     if uploaded_files:
         num_files = len(uploaded_files)
-        st.spacer(height=1)
+        st.markdown("<br>", unsafe_allow_html=True)
         if num_files == 1:
             st.caption(f"Завантажено 1 референсне зображення")
             st.image(uploaded_files[0], caption="Референсне зображення", width="container")
@@ -122,12 +122,12 @@ with st.container():
                     st.image(uploaded_file, caption=f"Референс {idx + 1}: {uploaded_file.name}", width="container")
 
 st.divider()
-st.spacer(height=2)
+st.markdown("<br><br>", unsafe_allow_html=True)
 
 # Section 2: Prompt input (middle)
 with st.container():
     st.subheader("✍️ Промпт")
-    st.spacer(height=1)
+    st.markdown("<br>", unsafe_allow_html=True)
     
     # Initialize session state for prompt management
     if 'prompt_type' not in st.session_state:
@@ -146,7 +146,7 @@ with st.container():
         key="prompt_type_selector"
     )
     
-    st.spacer(height=1)
+    st.markdown("<br>", unsafe_allow_html=True)
     
     # Update session state when selection changes
     current_prompt_type = 'women' if prompt_type == "Жінки" else 'men'
@@ -188,7 +188,7 @@ with st.container():
     else:
         st.session_state['edited_prompt_men'] = prompt
     
-    st.spacer(height=2)
+    st.markdown("<br><br>", unsafe_allow_html=True)
     
     # Generate button - more prominent placement
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -208,12 +208,12 @@ if generate_button:
         st.info(f"ℹ️ Буде використано {len(uploaded_files)} референсних зображень")
     
     st.divider()
-    st.spacer(height=2)
+    st.markdown("<br><br>", unsafe_allow_html=True)
     
     # Section 3: Result display (bottom)
     with st.container():
         st.subheader("🎨 Результат генерації")
-        st.spacer(height=1)
+        st.markdown("<br>", unsafe_allow_html=True)
     
     # Show progress
     progress_bar = st.progress(0)
@@ -315,9 +315,9 @@ if generate_button:
         if image_bytes:
             # Display generated image
             st.success("🎉 Зображення успішно згенеровано!")
-            st.spacer(height=1)
+            st.markdown("<br>", unsafe_allow_html=True)
             st.image(image_bytes, caption="Згенероване зображення", width="container")
-            st.spacer(height=1)
+            st.markdown("<br>", unsafe_allow_html=True)
             
             # Download button
             col1, col2, col3 = st.columns([1, 2, 1])
@@ -363,12 +363,12 @@ if generate_button:
 # Display previously generated image if exists
 if 'generated_image' in st.session_state and not generate_button:
     st.divider()
-    st.spacer(height=2)
+    st.markdown("<br><br>", unsafe_allow_html=True)
     with st.container():
         st.subheader("📸 Останнє згенероване зображення")
-        st.spacer(height=1)
+        st.markdown("<br>", unsafe_allow_html=True)
         st.image(st.session_state['generated_image'], caption="Останнє згенероване зображення", width="container")
-        st.spacer(height=1)
+        st.markdown("<br>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             st.download_button(
