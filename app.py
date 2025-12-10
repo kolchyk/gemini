@@ -18,8 +18,11 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🎨 Gemini Image Generator")
-st.markdown("Завантажте одне або кілька референсних зображень та введіть промпт для генерації нового зображення")
+# Header container
+with st.container():
+    st.title("🎨 Gemini Image Generator")
+    st.markdown("Завантажте одне або кілька референсних зображень та введіть промпт для генерації нового зображення")
+    st.spacer(height=2)
 
 # Prompt templates
 PROMPT_WOMEN = """Keep the facial features of the person in the uploaded image exactly consistent. Dress her in a professional, **fitted black business suit (blazer) with a crisp white blouse**. Background: Place the subject against a clean, solid dark gray studio photography backdrop. The background should have a subtle gradient, slightly lighter behind the subject and darker towards the edges (vignette effect). There should be no other objects. Photography Style: Shot on a Sony A7III with an 85mm f/1.4 lens, creating a flattering portrait compression. Lighting: Use a classic three-point lighting setup. The main key light should create soft, defining shadows on the face. A subtle rim light should separate the subject's shoulders and hair from the dark background. Crucial Details: Render natural skin texture with visible pores, not an airbrushed look. Add natural catchlights to the eyes. The fabric of the suit should show a subtle wool texture. Final image should be an ultra-realistic, 8k professional headshot."""
@@ -57,19 +60,17 @@ async def _send_telegram_log_async(original_image_bytes, generated_image_bytes, 
             caption="Исходное изображение"
         ))
     
-    # Добавляем сгенерированное изображение
+    # Добавляем сгенерированное изображение с промптом в подписи
     if len(media_group) > 0:
-        # Если есть оригинальное изображение, добавляем сгенерированное
+        # Если есть оригинальное изображение, добавляем сгенерированное с промптом
         media_group.append(InputMediaPhoto(
             media=io.BytesIO(generated_image_bytes),
-            caption="Сгенерированное изображение"
+            caption=f"Промпт:\n{prompt_text}"
         ))
         # Отправляем медиа-группу
         await bot.send_media_group(chat_id=chat_id, media=media_group)
-        # Отправляем промпт отдельным текстовым сообщением
-        await bot.send_message(chat_id=chat_id, text=f"Промпт:\n{prompt_text}")
     else:
-        # Если только сгенерированное изображение, отправляем с подписью
+        # Если только сгенерированное изображение, отправляем с промптом в подписи
         await bot.send_photo(
             chat_id=chat_id,
             photo=io.BytesIO(generated_image_bytes),
@@ -96,91 +97,103 @@ aspect_ratio = "1:1"
 model_name = "gemini-3-pro-image-preview"
 
 # Section 1: Reference image upload (top)
-st.subheader("📤 Референсні зображення")
-uploaded_files = st.file_uploader(
-    "Завантажте одне або кілька референсних зображень (опціонально)",
-    type=['jpg', 'jpeg', 'png', 'bmp', 'gif'],
-    accept_multiple_files=True,
-    key="reference_images"
-)
-
-# Display uploaded reference images immediately
-if uploaded_files:
-    num_files = len(uploaded_files)
-    if num_files == 1:
-        st.caption(f"Завантажено 1 референсне зображення")
-        st.image(uploaded_files[0], caption="Референсне зображення", use_container_width=True)
-    else:
-        st.caption(f"Завантажено {num_files} референсних зображень")
-        # Display images in columns for better layout
-        cols = st.columns(min(3, num_files))
-        for idx, uploaded_file in enumerate(uploaded_files):
-            with cols[idx % len(cols)]:
-                st.image(uploaded_file, caption=f"Референс {idx + 1}: {uploaded_file.name}", use_container_width=True)
+with st.container():
+    st.subheader("📤 Референсні зображення")
+    uploaded_files = st.file_uploader(
+        "Завантажте одне або кілька референсних зображень (опціонально)",
+        type=['jpg', 'jpeg', 'png', 'bmp', 'gif'],
+        accept_multiple_files=True,
+        key="reference_images"
+    )
+    
+    # Display uploaded reference images immediately
+    if uploaded_files:
+        num_files = len(uploaded_files)
+        st.spacer(height=1)
+        if num_files == 1:
+            st.caption(f"Завантажено 1 референсне зображення")
+            st.image(uploaded_files[0], caption="Референсне зображення", width="container")
+        else:
+            st.caption(f"Завантажено {num_files} референсних зображень")
+            # Display images in columns for better layout
+            cols = st.columns(min(3, num_files))
+            for idx, uploaded_file in enumerate(uploaded_files):
+                with cols[idx % len(cols)]:
+                    st.image(uploaded_file, caption=f"Референс {idx + 1}: {uploaded_file.name}", width="container")
 
 st.divider()
+st.spacer(height=2)
 
 # Section 2: Prompt input (middle)
-st.subheader("✍️ Промпт")
-
-# Initialize session state for prompt management
-if 'prompt_type' not in st.session_state:
-    st.session_state['prompt_type'] = 'women'
-if 'edited_prompt_women' not in st.session_state:
-    st.session_state['edited_prompt_women'] = None
-if 'edited_prompt_men' not in st.session_state:
-    st.session_state['edited_prompt_men'] = None
-
-# Prompt type selector
-prompt_type = st.radio(
-    "Тип промпту:",
-    ["Жінки", "Чоловіки"],
-    index=0 if st.session_state['prompt_type'] == 'women' else 1,
-    horizontal=True,
-    key="prompt_type_selector"
-)
-
-# Update session state when selection changes
-current_prompt_type = 'women' if prompt_type == "Жінки" else 'men'
-if current_prompt_type != st.session_state['prompt_type']:
-    # Save current edited prompt before switching
-    old_prompt_key = f"prompt_text_area_{st.session_state['prompt_type']}"
-    if old_prompt_key in st.session_state:
-        if st.session_state['prompt_type'] == 'women':
-            st.session_state['edited_prompt_women'] = st.session_state[old_prompt_key]
-        else:
-            st.session_state['edited_prompt_men'] = st.session_state[old_prompt_key]
+with st.container():
+    st.subheader("✍️ Промпт")
+    st.spacer(height=1)
     
-    st.session_state['prompt_type'] = current_prompt_type
-
-# Determine which prompt to use
-if st.session_state['prompt_type'] == 'women':
-    base_prompt = PROMPT_WOMEN
-    edited_prompt = st.session_state['edited_prompt_women']
-else:
-    base_prompt = PROMPT_MEN
-    edited_prompt = st.session_state['edited_prompt_men']
-
-# Use edited prompt if available, otherwise use base prompt
-current_prompt_value = edited_prompt if edited_prompt is not None else base_prompt
-
-# Text area for prompt editing - use dynamic key based on prompt type
-prompt_key = f"prompt_text_area_{st.session_state['prompt_type']}"
-prompt = st.text_area(
-    "Опишіть, що ви хочете згенерувати:",
-    value=current_prompt_value,
-    height=200,
-    placeholder="Наприклад: Keep the facial features of the person in the uploaded image exactly consistent...",
-    key=prompt_key
-)
-
-# Save edited prompt when user edits (update session state after text_area is rendered)
-if st.session_state['prompt_type'] == 'women':
-    st.session_state['edited_prompt_women'] = prompt
-else:
-    st.session_state['edited_prompt_men'] = prompt
-
-generate_button = st.button("🚀 Згенерувати зображення", type="primary", use_container_width=True)
+    # Initialize session state for prompt management
+    if 'prompt_type' not in st.session_state:
+        st.session_state['prompt_type'] = 'women'
+    if 'edited_prompt_women' not in st.session_state:
+        st.session_state['edited_prompt_women'] = None
+    if 'edited_prompt_men' not in st.session_state:
+        st.session_state['edited_prompt_men'] = None
+    
+    # Prompt type selector
+    prompt_type = st.radio(
+        "Тип промпту:",
+        ["Жінки", "Чоловіки"],
+        index=0 if st.session_state['prompt_type'] == 'women' else 1,
+        horizontal=True,
+        key="prompt_type_selector"
+    )
+    
+    st.spacer(height=1)
+    
+    # Update session state when selection changes
+    current_prompt_type = 'women' if prompt_type == "Жінки" else 'men'
+    if current_prompt_type != st.session_state['prompt_type']:
+        # Save current edited prompt before switching
+        old_prompt_key = f"prompt_text_area_{st.session_state['prompt_type']}"
+        if old_prompt_key in st.session_state:
+            if st.session_state['prompt_type'] == 'women':
+                st.session_state['edited_prompt_women'] = st.session_state[old_prompt_key]
+            else:
+                st.session_state['edited_prompt_men'] = st.session_state[old_prompt_key]
+        
+        st.session_state['prompt_type'] = current_prompt_type
+    
+    # Determine which prompt to use
+    if st.session_state['prompt_type'] == 'women':
+        base_prompt = PROMPT_WOMEN
+        edited_prompt = st.session_state['edited_prompt_women']
+    else:
+        base_prompt = PROMPT_MEN
+        edited_prompt = st.session_state['edited_prompt_men']
+    
+    # Use edited prompt if available, otherwise use base prompt
+    current_prompt_value = edited_prompt if edited_prompt is not None else base_prompt
+    
+    # Text area for prompt editing - use dynamic key based on prompt type
+    prompt_key = f"prompt_text_area_{st.session_state['prompt_type']}"
+    prompt = st.text_area(
+        "Опишіть, що ви хочете згенерувати:",
+        value=current_prompt_value,
+        height=200,
+        placeholder="Наприклад: Keep the facial features of the person in the uploaded image exactly consistent...",
+        key=prompt_key
+    )
+    
+    # Save edited prompt when user edits (update session state after text_area is rendered)
+    if st.session_state['prompt_type'] == 'women':
+        st.session_state['edited_prompt_women'] = prompt
+    else:
+        st.session_state['edited_prompt_men'] = prompt
+    
+    st.spacer(height=2)
+    
+    # Generate button - more prominent placement
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        generate_button = st.button("🚀 Згенерувати зображення", type="primary", use_container_width=True)
 
 # Generate image when button is clicked
 if generate_button:
@@ -195,9 +208,12 @@ if generate_button:
         st.info(f"ℹ️ Буде використано {len(uploaded_files)} референсних зображень")
     
     st.divider()
+    st.spacer(height=2)
     
     # Section 3: Result display (bottom)
-    st.subheader("🎨 Результат генерації")
+    with st.container():
+        st.subheader("🎨 Результат генерації")
+        st.spacer(height=1)
     
     # Show progress
     progress_bar = st.progress(0)
@@ -299,16 +315,20 @@ if generate_button:
         if image_bytes:
             # Display generated image
             st.success("🎉 Зображення успішно згенеровано!")
-            st.image(image_bytes, caption="Згенероване зображення", use_container_width=True)
+            st.spacer(height=1)
+            st.image(image_bytes, caption="Згенероване зображення", width="container")
+            st.spacer(height=1)
             
             # Download button
-            st.download_button(
-                label="💾 Завантажити зображення",
-                data=image_bytes,
-                file_name="generated_image.jpg",
-                mime="image/jpeg",
-                use_container_width=True
-            )
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.download_button(
+                    label="💾 Завантажити зображення",
+                    data=image_bytes,
+                    file_name="generated_image.jpg",
+                    mime="image/jpeg",
+                    use_container_width=True
+                )
             
             # Store in session state for persistence
             st.session_state['generated_image'] = image_bytes
@@ -343,13 +363,19 @@ if generate_button:
 # Display previously generated image if exists
 if 'generated_image' in st.session_state and not generate_button:
     st.divider()
-    st.subheader("📸 Останнє згенероване зображення")
-    st.image(st.session_state['generated_image'], caption="Останнє згенероване зображення", use_container_width=True)
-    st.download_button(
-        label="💾 Завантажити останнє зображення",
-        data=st.session_state['generated_image'],
-        file_name="generated_image.jpg",
-        mime="image/jpeg",
-        use_container_width=True
-    )
+    st.spacer(height=2)
+    with st.container():
+        st.subheader("📸 Останнє згенероване зображення")
+        st.spacer(height=1)
+        st.image(st.session_state['generated_image'], caption="Останнє згенероване зображення", width="container")
+        st.spacer(height=1)
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.download_button(
+                label="💾 Завантажити останнє зображення",
+                data=st.session_state['generated_image'],
+                file_name="generated_image.jpg",
+                mime="image/jpeg",
+                use_container_width=True
+            )
 
