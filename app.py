@@ -112,14 +112,14 @@ with st.container():
         st.markdown("<br>", unsafe_allow_html=True)
         if num_files == 1:
             st.caption(f"Завантажено 1 референсне зображення")
-            st.image(uploaded_files[0], caption="Референсне зображення", width="container")
+            st.image(uploaded_files[0], caption="Референсне зображення", width="stretch")
         else:
             st.caption(f"Завантажено {num_files} референсних зображень")
             # Display images in columns for better layout
             cols = st.columns(min(3, num_files))
             for idx, uploaded_file in enumerate(uploaded_files):
                 with cols[idx % len(cols)]:
-                    st.image(uploaded_file, caption=f"Референс {idx + 1}: {uploaded_file.name}", width="container")
+                    st.image(uploaded_file, caption=f"Референс {idx + 1}: {uploaded_file.name}", width="stretch")
 
 st.divider()
 st.markdown("<br><br>", unsafe_allow_html=True)
@@ -316,7 +316,7 @@ if generate_button:
             # Display generated image
             st.success("🎉 Зображення успішно згенеровано!")
             st.markdown("<br>", unsafe_allow_html=True)
-            st.image(image_bytes, caption="Згенероване зображення", width="container")
+            st.image(image_bytes, caption="Згенероване зображення", width="stretch")
             st.markdown("<br>", unsafe_allow_html=True)
             
             # Download button
@@ -367,7 +367,7 @@ if 'generated_image' in st.session_state and not generate_button:
     with st.container():
         st.subheader("📸 Останнє згенероване зображення")
         st.markdown("<br>", unsafe_allow_html=True)
-        st.image(st.session_state['generated_image'], caption="Останнє згенероване зображення", width="container")
+        st.image(st.session_state['generated_image'], caption="Останнє згенероване зображення", width="stretch")
         st.markdown("<br>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
