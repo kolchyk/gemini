@@ -31,19 +31,9 @@ def get_gemini_client():
         st.stop()
     return genai.Client(api_key=api_key)
 
-# Sidebar for settings
-with st.sidebar:
-    st.header("⚙️ Налаштування")
-    aspect_ratio = st.selectbox(
-        "Співвідношення сторін",
-        ["1:1", "16:9", "9:16", "4:3", "3:4"],
-        index=0
-    )
-    model_name = st.selectbox(
-        "Модель",
-        ["gemini-3-pro-image-preview"],
-        index=0
-    )
+# Default settings (no sidebar needed)
+aspect_ratio = "1:1"
+model_name = "gemini-3-pro-image-preview"
 
 # Section 1: Reference image upload (top)
 st.subheader("📤 Референсні зображення")
