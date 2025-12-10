@@ -67,8 +67,10 @@ st.divider()
 
 # Section 2: Prompt input (middle)
 st.subheader("✍️ Промпт")
+default_prompt = """Keep the facial features of the person in the uploaded image exactly consistent. Dress her in a professional, **fitted black business suit (blazer) with a crisp white blouse**. Background: Place the subject against a clean, solid dark gray studio photography backdrop. The background should have a subtle gradient, slightly lighter behind the subject and darker towards the edges (vignette effect). There should be no other objects. Photography Style: Shot on a Sony A7III with an 85mm f/1.4 lens, creating a flattering portrait compression. Lighting: Use a classic three-point lighting setup. The main key light should create soft, defining shadows on the face. A subtle rim light should separate the subject's shoulders and hair from the dark background. Crucial Details: Render natural skin texture with visible pores, not an airbrushed look. Add natural catchlights to the eyes. The fabric of the suit should show a subtle wool texture. Final image should be an ultra-realistic, 8k professional headshot."""
 prompt = st.text_area(
     "Опишіть, що ви хочете згенерувати:",
+    value=default_prompt,
     height=200,
     placeholder="Наприклад: Keep the facial features of the person in the uploaded image exactly consistent. Dress her in a professional, fitted black business suit..."
 )
