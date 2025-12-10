@@ -17,6 +17,11 @@ st.set_page_config(
 st.title("🎨 Gemini Image Generator")
 st.markdown("Завантажте одне або кілька референсних зображень та введіть промпт для генерації нового зображення")
 
+# Prompt templates
+PROMPT_WOMEN = """Keep the facial features of the person in the uploaded image exactly consistent. Dress her in a professional, **fitted black business suit (blazer) with a crisp white blouse**. Background: Place the subject against a clean, solid dark gray studio photography backdrop. The background should have a subtle gradient, slightly lighter behind the subject and darker towards the edges (vignette effect). There should be no other objects. Photography Style: Shot on a Sony A7III with an 85mm f/1.4 lens, creating a flattering portrait compression. Lighting: Use a classic three-point lighting setup. The main key light should create soft, defining shadows on the face. A subtle rim light should separate the subject's shoulders and hair from the dark background. Crucial Details: Render natural skin texture with visible pores, not an airbrushed look. Add natural catchlights to the eyes. The fabric of the suit should show a subtle wool texture. Final image should be an ultra-realistic, 8k professional headshot."""
+
+PROMPT_MEN = """Keep the facial features of the person in the uploaded image exactly consistent . Dress them in a professional  black business suit  with a white shirt  and a tie, similar to the reference image. Background : Place the subject against a clean, solid dark gray studio photography backdrop . The background should have a subtle gradient , slightly lighter behind the subject and darker towards the edges (vignette effect). There should be no other objects. Photography Style : Shot on a Sony A7III with an 85mm f/1.4 lens , creating a flattering portrait compression. Lighting : Use a classic three-point lighting setup . The main key light should create soft, defining shadows on the face. A subtle rim light should separate the subject's shoulders and hair from the dark background. Crucial Details : Render natural skin texture with visible pores , not an airbrushed look. Add natural catchlights to the eyes . The fabric of the suit should show a subtle wool texture.Final image should be an ultra-realistic, 8k professional headshot."""
+
 # Initialize Gemini client
 @st.cache_resource
 def get_gemini_client():
@@ -67,13 +72,63 @@ st.divider()
 
 # Section 2: Prompt input (middle)
 st.subheader("✍️ Промпт")
-default_prompt = """Keep the facial features of the person in the uploaded image exactly consistent. Dress her in a professional, **fitted black business suit (blazer) with a crisp white blouse**. Background: Place the subject against a clean, solid dark gray studio photography backdrop. The background should have a subtle gradient, slightly lighter behind the subject and darker towards the edges (vignette effect). There should be no other objects. Photography Style: Shot on a Sony A7III with an 85mm f/1.4 lens, creating a flattering portrait compression. Lighting: Use a classic three-point lighting setup. The main key light should create soft, defining shadows on the face. A subtle rim light should separate the subject's shoulders and hair from the dark background. Crucial Details: Render natural skin texture with visible pores, not an airbrushed look. Add natural catchlights to the eyes. The fabric of the suit should show a subtle wool texture. Final image should be an ultra-realistic, 8k professional headshot."""
+
+# Initialize session state for prompt management
+if 'prompt_type' not in st.session_state:
+    st.session_state['prompt_type'] = 'women'
+if 'edited_prompt_women' not in st.session_state:
+    st.session_state['edited_prompt_women'] = None
+if 'edited_prompt_men' not in st.session_state:
+    st.session_state['edited_prompt_men'] = None
+
+# Prompt type selector
+prompt_type = st.radio(
+    "Тип промпту:",
+    ["Жінки", "Чоловіки"],
+    index=0 if st.session_state['prompt_type'] == 'women' else 1,
+    horizontal=True,
+    key="prompt_type_selector"
+)
+
+# Update session state when selection changes
+current_prompt_type = 'women' if prompt_type == "Жінки" else 'men'
+if current_prompt_type != st.session_state['prompt_type']:
+    # Save current edited prompt before switching
+    old_prompt_key = f"prompt_text_area_{st.session_state['prompt_type']}"
+    if old_prompt_key in st.session_state:
+        if st.session_state['prompt_type'] == 'women':
+            st.session_state['edited_prompt_women'] = st.session_state[old_prompt_key]
+        else:
+            st.session_state['edited_prompt_men'] = st.session_state[old_prompt_key]
+    
+    st.session_state['prompt_type'] = current_prompt_type
+
+# Determine which prompt to use
+if st.session_state['prompt_type'] == 'women':
+    base_prompt = PROMPT_WOMEN
+    edited_prompt = st.session_state['edited_prompt_women']
+else:
+    base_prompt = PROMPT_MEN
+    edited_prompt = st.session_state['edited_prompt_men']
+
+# Use edited prompt if available, otherwise use base prompt
+current_prompt_value = edited_prompt if edited_prompt is not None else base_prompt
+
+# Text area for prompt editing - use dynamic key based on prompt type
+prompt_key = f"prompt_text_area_{st.session_state['prompt_type']}"
 prompt = st.text_area(
     "Опишіть, що ви хочете згенерувати:",
-    value=default_prompt,
+    value=current_prompt_value,
     height=200,
-    placeholder="Наприклад: Keep the facial features of the person in the uploaded image exactly consistent. Dress her in a professional, fitted black business suit..."
+    placeholder="Наприклад: Keep the facial features of the person in the uploaded image exactly consistent...",
+    key=prompt_key
 )
+
+# Save edited prompt when user edits (update session state after text_area is rendered)
+if st.session_state['prompt_type'] == 'women':
+    st.session_state['edited_prompt_women'] = prompt
+else:
+    st.session_state['edited_prompt_men'] = prompt
 
 generate_button = st.button("🚀 Згенерувати зображення", type="primary", use_container_width=True)
 
