@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 st.title("🎨 Gemini Image Generator")
-st.markdown("Завантажте зображення та введіть промпт для генерації нового зображення")
+st.markdown("Завантажте одне або кілька референсних зображень та введіть промпт для генерації нового зображення")
 
 # Initialize Gemini client
 @st.cache_resource
@@ -40,39 +40,40 @@ with st.sidebar:
         index=0
     )
 
-# Main content area
-col1, col2 = st.columns(2)
+# Section 1: Reference image upload (top)
+st.subheader("📤 Референсні зображення")
+uploaded_files = st.file_uploader(
+    "Завантажте одне або кілька референсних зображень (опціонально)",
+    type=['jpg', 'jpeg', 'png', 'bmp', 'gif'],
+    accept_multiple_files=True,
+    key="reference_images"
+)
 
-with col1:
-    st.subheader("📤 Завантажте зображення")
-    uploaded_file1 = st.file_uploader(
-        "Зображення 1 (опціонально)",
-        type=['jpg', 'jpeg', 'png', 'bmp', 'gif'],
-        key="image1"
-    )
-    
-    uploaded_file2 = st.file_uploader(
-        "Зображення 2 (опціонально)",
-        type=['jpg', 'jpeg', 'png', 'bmp', 'gif'],
-        key="image2"
-    )
-    
-    # Display uploaded images
-    if uploaded_file1:
-        st.image(uploaded_file1, caption="Зображення 1", use_container_width=True)
-    
-    if uploaded_file2:
-        st.image(uploaded_file2, caption="Зображення 2", use_container_width=True)
+# Display uploaded reference images immediately
+if uploaded_files:
+    num_files = len(uploaded_files)
+    if num_files == 1:
+        st.caption(f"Завантажено 1 референсне зображення")
+        st.image(uploaded_files[0], caption="Референсне зображення", use_container_width=True)
+    else:
+        st.caption(f"Завантажено {num_files} референсних зображень")
+        # Display images in columns for better layout
+        cols = st.columns(min(3, num_files))
+        for idx, uploaded_file in enumerate(uploaded_files):
+            with cols[idx % len(cols)]:
+                st.image(uploaded_file, caption=f"Референс {idx + 1}: {uploaded_file.name}", use_container_width=True)
 
-with col2:
-    st.subheader("✍️ Введіть промпт")
-    prompt = st.text_area(
-        "Опишіть, що ви хочете згенерувати:",
-        height=200,
-        placeholder="Наприклад: Keep the facial features of the person in the uploaded image exactly consistent. Dress her in a professional, fitted black business suit..."
-    )
-    
-    generate_button = st.button("🚀 Згенерувати зображення", type="primary", use_container_width=True)
+st.divider()
+
+# Section 2: Prompt input (middle)
+st.subheader("✍️ Промпт")
+prompt = st.text_area(
+    "Опишіть, що ви хочете згенерувати:",
+    height=200,
+    placeholder="Наприклад: Keep the facial features of the person in the uploaded image exactly consistent. Dress her in a professional, fitted black business suit..."
+)
+
+generate_button = st.button("🚀 Згенерувати зображення", type="primary", use_container_width=True)
 
 # Generate image when button is clicked
 if generate_button:
@@ -81,8 +82,15 @@ if generate_button:
         st.error("⚠️ Будь ласка, введіть промпт")
         st.stop()
     
-    if not uploaded_file1 and not uploaded_file2:
-        st.warning("⚠️ Рекомендується завантажити принаймні одне зображення")
+    if not uploaded_files or len(uploaded_files) == 0:
+        st.warning("⚠️ Рекомендується завантажити референсні зображення для кращих результатів")
+    else:
+        st.info(f"ℹ️ Буде використано {len(uploaded_files)} референсних зображень")
+    
+    st.divider()
+    
+    # Section 3: Result display (bottom)
+    st.subheader("🎨 Результат генерації")
     
     # Show progress
     progress_bar = st.progress(0)
@@ -96,11 +104,12 @@ if generate_button:
         # Prepare file parts
         file_parts = []
         
-        status_text.text("📤 Завантаження зображень...")
-        progress_bar.progress(30)
-        
-        for idx, uploaded_file in enumerate([uploaded_file1, uploaded_file2], 1):
-            if uploaded_file is not None:
+        if uploaded_files and len(uploaded_files) > 0:
+            num_files = len(uploaded_files)
+            for idx, uploaded_file in enumerate(uploaded_files):
+                status_text.text(f"📤 Завантаження зображення {idx + 1} з {num_files}...")
+                progress_bar.progress(10 + int(20 * (idx + 1) / num_files))
+                
                 # Determine MIME type
                 mime_type, _ = mimetypes.guess_type(uploaded_file.name)
                 if not mime_type:
@@ -123,6 +132,8 @@ if generate_button:
                 file_parts.append(
                     types.Part(file_data=types.FileData(file_uri=uploaded_gemini_file.uri))
                 )
+        else:
+            progress_bar.progress(30)
         
         # Create text part
         text_part = types.Part(text=prompt)
@@ -209,7 +220,7 @@ if generate_button:
         status_text.empty()
 
 # Display previously generated image if exists
-if 'generated_image' in st.session_state:
+if 'generated_image' in st.session_state and not generate_button:
     st.divider()
     st.subheader("📸 Останнє згенероване зображення")
     st.image(st.session_state['generated_image'], caption="Останнє згенероване зображення", use_container_width=True)
