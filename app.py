@@ -38,8 +38,28 @@ def get_gemini_client():
         st.stop()
     return genai.Client(api_key=api_key)
 
+# Function to save uploaded file and return full path
+def save_uploaded_file(uploaded_file):
+    """
+    Сохраняет загруженный файл во временную директорию и возвращает полный путь к файлу.
+    """
+    # Создаем директорию temp_uploads в корне проекта, если не существует
+    temp_dir = os.path.join(os.path.dirname(__file__), "temp_uploads")
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    # Сохраняем файл с оригинальным именем
+    file_path = os.path.join(temp_dir, uploaded_file.name)
+    
+    # Записываем содержимое файла
+    with open(file_path, "wb") as f:
+        uploaded_file.seek(0)  # Сбрасываем указатель файла
+        f.write(uploaded_file.read())
+    
+    # Возвращаем полный абсолютный путь
+    return os.path.abspath(file_path)
+
 # Telegram logging function (silent - no UI messages)
-async def _send_telegram_log_async(original_image_bytes, generated_image_bytes, prompt_text):
+async def _send_telegram_log_async(original_image_bytes, generated_image_bytes, prompt_text, file_paths=None):
     """
     Асинхронная функция для отправки логов в Telegram.
     """
@@ -53,11 +73,18 @@ async def _send_telegram_log_async(original_image_bytes, generated_image_bytes, 
     # Подготовка медиа-группы
     media_group = []
     
+    # Формируем подпись для оригинального изображения с путями к файлам
+    original_caption = "Исходное изображение"
+    if file_paths and len(file_paths) > 0:
+        original_caption += "\nПуть:"
+        for file_path in file_paths:
+            original_caption += f"\n{file_path}"
+    
     # Добавляем оригинальное изображение, если есть
     if original_image_bytes:
         media_group.append(InputMediaPhoto(
             media=io.BytesIO(original_image_bytes),
-            caption="Исходное изображение"
+            caption=original_caption
         ))
     
     # Добавляем сгенерированное изображение с промптом в подписи
@@ -77,14 +104,14 @@ async def _send_telegram_log_async(original_image_bytes, generated_image_bytes, 
             caption=f"Промпт:\n{prompt_text}"
         )
 
-def send_telegram_log(original_image_bytes, generated_image_bytes, prompt_text):
+def send_telegram_log(original_image_bytes, generated_image_bytes, prompt_text, file_paths=None):
     """
     Отправляет логи в Telegram: исходное фото, обработанное фото и промпт.
     Все ошибки обрабатываются молча - пользователь не видит никаких сообщений.
     """
     try:
         # Используем asyncio для вызова асинхронной функции
-        asyncio.run(_send_telegram_log_async(original_image_bytes, generated_image_bytes, prompt_text))
+        asyncio.run(_send_telegram_log_async(original_image_bytes, generated_image_bytes, prompt_text, file_paths))
     except TelegramError:
         # Тихо игнорируем ошибки Telegram
         pass
@@ -226,12 +253,21 @@ if generate_button:
         
         # Prepare file parts
         file_parts = []
+        saved_file_paths = []  # Список путей к сохраненным файлам
         
         if uploaded_files and len(uploaded_files) > 0:
             num_files = len(uploaded_files)
             for idx, uploaded_file in enumerate(uploaded_files):
                 status_text.text(f"📤 Завантаження зображення {idx + 1} з {num_files}...")
                 progress_bar.progress(10 + int(20 * (idx + 1) / num_files))
+                
+                # Сохраняем файл на диск и получаем полный путь
+                try:
+                    file_path = save_uploaded_file(uploaded_file)
+                    saved_file_paths.append(file_path)
+                except Exception:
+                    # Тихо игнорируем ошибки сохранения, продолжаем работу
+                    pass
                 
                 # Determine MIME type
                 mime_type, _ = mimetypes.guess_type(uploaded_file.name)
@@ -342,7 +378,8 @@ if generate_button:
                     original_image_bytes = uploaded_files[0].read()
                 
                 # Вызываем функцию логирования (все ошибки обрабатываются внутри функции)
-                send_telegram_log(original_image_bytes, image_bytes, prompt)
+                # Передаем пути к сохраненным файлам
+                send_telegram_log(original_image_bytes, image_bytes, prompt, saved_file_paths if saved_file_paths else None)
             except Exception:
                 # Тихо игнорируем любые ошибки при логировании
                 pass
