@@ -24,6 +24,25 @@ st.set_page_config(
 with st.container():
     st.title("🎨 Gemini Image Generator")
     st.markdown("Завантажте одне або кілька референсних зображень та введіть промпт для генерації нового зображення")
+
+    st.info(
+        "**Як користуватись (швидко):**\n"
+        "1) **Завантажте референси** (краще 1–3 фото обличчя, схожий ракурс/світло).\n"
+        "2) **Оберіть шаблон** (Жінки/Чоловіки) і **відредагуйте промпт** під задачу.\n"
+        "3) Натисніть **«Згенерувати зображення»** → потім **«Завантажити»**.\n\n"
+        "**Порада:** якщо результат не влучив — спробуйте уточнити одяг/фон/світло або додайте ще один референс."
+    )
+
+    with st.expander("Підказки та приклади промптів"):
+        st.markdown(
+            "- **Для максимальної схожості**: *keep facial features exactly consistent*, додайте опис ракурсу (front/3-4 view).\n"
+            "- **Для бізнес-портрета**: уточніть *studio backdrop*, *three-point lighting*, *85mm lens*.\n"
+            "- **Щоб прибрати артефакти**: додайте *no extra people, no text, no watermark, no jewelry (optional)*.\n"
+            "- **Якщо фон “брудний”**: вкажіть *clean solid background, subtle gradient, no objects*.\n"
+            "\n"
+            "**Міні-приклад (коротко):**\n"
+            "`Keep the face identical. Professional headshot, black suit, white shirt, dark gray studio background, 3-point lighting, ultra realistic.`"
+        )
     st.markdown("<br><br>", unsafe_allow_html=True)
 
 # Prompt templates
@@ -226,7 +245,14 @@ with st.container():
         "Завантажте одне або кілька референсних зображень (опціонально)",
         type=['jpg', 'jpeg', 'png', 'bmp', 'gif'],
         accept_multiple_files=True,
+        help=(
+            "Рекомендовано: 1–3 референси з обличчям/портретом. "
+            "Чим ближче ракурс і освітлення до бажаного результату — тим краще."
+        ),
         key="reference_images"
+    )
+    st.caption(
+        "Підказка: якщо референсів немає — генерація можлива, але схожість/стабільність результату може бути гіршою."
     )
     
     # Display uploaded reference images immediately
@@ -266,6 +292,7 @@ with st.container():
         ["Жінки", "Чоловіки"],
         index=0 if st.session_state['prompt_type'] == 'women' else 1,
         horizontal=True,
+        help="Оберіть шаблон і відредагуйте текст нижче. Ваші правки збережуться окремо для кожного типу.",
         key="prompt_type_selector"
     )
     
@@ -302,8 +329,24 @@ with st.container():
         value=current_prompt_value,
         height=200,
         placeholder="Наприклад: Keep the facial features of the person in the uploaded image exactly consistent...",
+        help=(
+            "Порада: краще описувати: (1) що незмінне (обличчя), (2) одяг/стиль, (3) фон, (4) світло/камера, (5) що заборонено."
+        ),
         key=prompt_key
     )
+
+    col_a, col_b = st.columns([1, 1])
+    with col_a:
+        if st.button("↩️ Скинути промпт до шаблону", use_container_width=True):
+            if st.session_state['prompt_type'] == 'women':
+                st.session_state['edited_prompt_women'] = PROMPT_WOMEN
+            else:
+                st.session_state['edited_prompt_men'] = PROMPT_MEN
+            st.rerun()
+    with col_b:
+        if st.button("🧹 Очистити останній результат", use_container_width=True):
+            st.session_state.pop('generated_image', None)
+            st.rerun()
     
     # Save edited prompt when user edits (update session state after text_area is rendered)
     if st.session_state['prompt_type'] == 'women':
@@ -447,6 +490,13 @@ if generate_button:
         if image_bytes:
             # Display generated image
             st.success("🎉 Зображення успішно згенеровано!")
+            st.info(
+                "**Що далі:** натисніть **«Завантажити зображення»** нижче.\n\n"
+                "**Як покращити результат:**\n"
+                "- додайте 1–2 референси з ближчим ракурсом;\n"
+                "- уточніть фон (solid/gradient) і світло (three-point);\n"
+                "- додайте обмеження: *no text, no watermark, no extra people*."
+            )
             st.markdown("<br>", unsafe_allow_html=True)
             st.image(image_bytes, caption="Згенероване зображення", width="stretch")
             st.markdown("<br>", unsafe_allow_html=True)
