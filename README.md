@@ -1,4 +1,4 @@
-# Gemini Image Generator
+# NanaBanana for Darnytsia
 
 Веб-додаток для генерації зображень за допомогою Google Gemini API.
 

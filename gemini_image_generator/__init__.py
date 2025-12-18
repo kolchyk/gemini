@@ -13,14 +13,14 @@ import asyncio
 
 # Page configuration
 st.set_page_config(
-    page_title="Gemini Image Generator",
+    page_title="NanaBanana for Darnytsia",
     page_icon="🎨",
     layout="wide"
 )
 
 # Header container
 with st.container():
-    st.title("🎨 Gemini Image Generator")
+    st.title("🍌 NanaBanana for Darnytsia")
     st.markdown("Завантажте одне або кілька референсних зображень та введіть промпт для генерації нового зображення")
     st.markdown("<br><br>", unsafe_allow_html=True)
 
