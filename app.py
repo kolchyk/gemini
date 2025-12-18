@@ -288,12 +288,45 @@ def check_research_status(interaction_id, client):
 # Create tabs
 tab1, tab2 = st.tabs(["🎨 Генератор зображень", "🔍 Deep Research Agent"])
 
-# Default settings (no sidebar needed)
-aspect_ratio = "1:1"
+# Default settings
 model_name = "gemini-3-pro-image-preview"
 
 # ========== TAB 1: IMAGE GENERATOR ==========
 with tab1:
+    # Section 0: Generation parameters (settings)
+    with st.container():
+        st.subheader("⚙️ Параметри генерації")
+        col_param1, col_param2, col_param3 = st.columns(3)
+        
+        with col_param1:
+            aspect_ratio = st.selectbox(
+                "Співвідношення сторін:",
+                options=["1:1", "16:9", "9:16", "4:3", "3:4"],
+                index=0,
+                help="Виберіть співвідношення сторін для згенерованого зображення"
+            )
+        
+        with col_param2:
+            resolution = st.selectbox(
+                "Роздільна здатність:",
+                options=["1K", "2K", "4K"],
+                index=0,
+                help="Виберіть роздільну здатність зображення (вища = краща якість, але довше генерація)"
+            )
+        
+        with col_param3:
+            temperature = st.slider(
+                "Temperature:",
+                min_value=0.0,
+                max_value=2.0,
+                value=1.0,
+                step=0.1,
+                help="Контролює випадковість генерації (0.0 = детерміновано, 2.0 = більше варіацій)"
+            )
+    
+    st.divider()
+    st.markdown("<br>", unsafe_allow_html=True)
+    
     # Section 1: Reference image upload (top)
     with st.container():
         st.subheader("📤 Референсні зображення")
@@ -303,7 +336,8 @@ with tab1:
             accept_multiple_files=True,
             help=(
                 "Рекомендовано: 1–3 референси з обличчям/портретом. "
-                "Чим ближче ракурс і освітлення до бажаного результату — тим краще."
+                "Чим ближче ракурс і освітлення до бажаного результату — тим краще. "
+                "Можна генерувати без референсів, але промпт обов'язковий."
             ),
             key="reference_images"
         )
@@ -419,14 +453,13 @@ with tab1:
 
     # Generate image when button is clicked
     if generate_button:
-        # Validation
+        # Validation - prompt is mandatory
         if not prompt or not prompt.strip():
-            st.error("⚠️ Будь ласка, введіть промпт")
+            st.error("⚠️ Будь ласка, введіть промпт. Промпт є обов'язковим для генерації зображення.")
             st.stop()
         
-        if not uploaded_files or len(uploaded_files) == 0:
-            st.warning("⚠️ Рекомендується завантажити референсні зображення для кращих результатів")
-        else:
+        # Source images are optional - just show info if provided
+        if uploaded_files and len(uploaded_files) > 0:
             st.info(f"ℹ️ Буде використано {len(uploaded_files)} референсних зображень")
         
         st.divider()
@@ -504,8 +537,10 @@ with tab1:
                 contents=contents,
                 config=types.GenerateContentConfig(
                     response_modalities=["IMAGE"],
+                    temperature=temperature,
                     image_config=types.ImageConfig(
                         aspect_ratio=aspect_ratio,
+                        image_size=resolution,
                     ),
                 ),
             )
