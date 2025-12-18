@@ -6,7 +6,7 @@ import mimetypes
 import time
 
 # Import from local modules
-from gemini_image_generator.config import CUSTOM_CSS, PROMPT_WOMEN, PROMPT_MEN
+from gemini_image_generator.config import CUSTOM_CSS, PROMPT_WOMEN, PROMPT_MEN, PROMPT_CUSTOM
 from gemini_image_generator.client import get_gemini_client
 from gemini_image_generator.file_utils import save_uploaded_file
 from gemini_image_generator.telegram_utils import send_telegram_log, send_telegram_text_log
@@ -71,7 +71,7 @@ with tab1:
             "Референсні зображення (опціонально)",
             type=['jpg', 'jpeg', 'png', 'bmp', 'gif'],
             accept_multiple_files=True,
-            help="Рекомендовано: 1–3 референси з обличчям. Промпт обов'язковий.",
+            help="Для режиму 'З нуля' - опціонально. Для режимів 'Жінки'/'Чоловіки' - рекомендовано 1–3 референси з обличчям. Промпт обов'язковий.",
             key="reference_images"
         )
         
@@ -88,32 +88,46 @@ with tab1:
         
         # Initialize session state for prompt management
         if 'prompt_type' not in st.session_state:
-            st.session_state['prompt_type'] = 'women'
+            st.session_state['prompt_type'] = 'custom'
         if 'edited_prompt_women' not in st.session_state:
             st.session_state['edited_prompt_women'] = None
         if 'edited_prompt_men' not in st.session_state:
             st.session_state['edited_prompt_men'] = None
+        if 'edited_prompt_custom' not in st.session_state:
+            st.session_state['edited_prompt_custom'] = None
         
         # Prompt type selector
+        prompt_type_options = ["З нуля (Власний промпт)", "Жінки", "Чоловіки"]
+        prompt_type_index_map = {'custom': 0, 'women': 1, 'men': 2}
+        current_index = prompt_type_index_map.get(st.session_state['prompt_type'], 0)
+        
         prompt_type = st.radio(
-            "Тип промпту:",
-            ["Жінки", "Чоловіки"],
-            index=0 if st.session_state['prompt_type'] == 'women' else 1,
+            "Режим генерації:",
+            prompt_type_options,
+            index=current_index,
             horizontal=True,
-            help="Оберіть шаблон і відредагуйте текст нижче. Ваші правки збережуться окремо для кожного типу.",
+            help="Оберіть режим генерації. 'З нуля' - для створення зображень з нуля, 'Жінки'/'Чоловіки' - для редагування фото. Ваші правки збережуться окремо для кожного режиму.",
             key="prompt_type_selector"
         )
         
         # Update session state when selection changes
-        current_prompt_type = 'women' if prompt_type == "Жінки" else 'men'
+        type_map = {
+            "З нуля (Власний промпт)": 'custom',
+            "Жінки": 'women',
+            "Чоловіки": 'men'
+        }
+        current_prompt_type = type_map[prompt_type]
+        
         if current_prompt_type != st.session_state['prompt_type']:
             # Save current edited prompt before switching
             old_prompt_key = f"prompt_text_area_{st.session_state['prompt_type']}"
             if old_prompt_key in st.session_state:
                 if st.session_state['prompt_type'] == 'women':
                     st.session_state['edited_prompt_women'] = st.session_state[old_prompt_key]
-                else:
+                elif st.session_state['prompt_type'] == 'men':
                     st.session_state['edited_prompt_men'] = st.session_state[old_prompt_key]
+                elif st.session_state['prompt_type'] == 'custom':
+                    st.session_state['edited_prompt_custom'] = st.session_state[old_prompt_key]
             
             st.session_state['prompt_type'] = current_prompt_type
         
@@ -121,9 +135,12 @@ with tab1:
         if st.session_state['prompt_type'] == 'women':
             base_prompt = PROMPT_WOMEN
             edited_prompt = st.session_state['edited_prompt_women']
-        else:
+        elif st.session_state['prompt_type'] == 'men':
             base_prompt = PROMPT_MEN
             edited_prompt = st.session_state['edited_prompt_men']
+        else:  # custom
+            base_prompt = PROMPT_CUSTOM
+            edited_prompt = st.session_state['edited_prompt_custom']
         
         # Use edited prompt if available, otherwise use base prompt
         current_prompt_value = edited_prompt if edited_prompt is not None else base_prompt
@@ -143,8 +160,10 @@ with tab1:
             if st.button("↩️ Скинути промпт до шаблону", width='stretch'):
                 if st.session_state['prompt_type'] == 'women':
                     st.session_state['edited_prompt_women'] = PROMPT_WOMEN
-                else:
+                elif st.session_state['prompt_type'] == 'men':
                     st.session_state['edited_prompt_men'] = PROMPT_MEN
+                else:  # custom
+                    st.session_state['edited_prompt_custom'] = PROMPT_CUSTOM
                 st.rerun()
         with col_b:
             if st.button("🧹 Очистити останній результат", width='stretch'):
@@ -154,8 +173,10 @@ with tab1:
         # Save edited prompt when user edits (update session state after text_area is rendered)
         if st.session_state['prompt_type'] == 'women':
             st.session_state['edited_prompt_women'] = prompt
-        else:
+        elif st.session_state['prompt_type'] == 'men':
             st.session_state['edited_prompt_men'] = prompt
+        else:  # custom
+            st.session_state['edited_prompt_custom'] = prompt
         
         # Generate button - more prominent placement
         col1, col2, col3 = st.columns([1, 2, 1])
@@ -164,7 +185,6 @@ with tab1:
     
     # Right settings panel
     with col_settings:
-        st.markdown('<div class="settings-panel">', unsafe_allow_html=True)
         st.markdown("### Параметри")
         
         aspect_ratio = st.selectbox(
@@ -193,8 +213,6 @@ with tab1:
         )
         st.session_state['image_temperature'] = temperature
         
-        st.markdown('</div>', unsafe_allow_html=True)
-
     # Generate image when button is clicked
     if generate_button:
         # Use settings from session state
@@ -502,7 +520,6 @@ with tab2:
     
     # Right settings panel
     with col_settings:
-        st.markdown('<div class="settings-panel">', unsafe_allow_html=True)
         st.markdown("### Управління")
         
         if st.session_state['research_interaction_id']:
@@ -618,8 +635,6 @@ with tab2:
         else:
             st.info("💡 Почніть дослідження, щоб побачити статус та управління тут.")
         
-        st.markdown('</div>', unsafe_allow_html=True)
-
 # ========== TAB 3: GEMINI 3 PRO CHAT ==========
 with tab3:
     # Create two-column layout: main content (3) and settings panel (1)
@@ -717,7 +732,6 @@ with tab3:
     
     # Right settings panel
     with col_settings:
-        st.markdown('<div class="settings-panel">', unsafe_allow_html=True)
         st.markdown("### Налаштування")
         
         thinking_level = st.selectbox(
@@ -741,6 +755,4 @@ with tab3:
         if st.button("🧹 Очистити чат", width='stretch', use_container_width=True):
             st.session_state['gemini_chat_history'] = []
             st.rerun()
-        
-        st.markdown('</div>', unsafe_allow_html=True)
 

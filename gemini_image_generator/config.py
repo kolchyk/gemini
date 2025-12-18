@@ -14,11 +14,9 @@ CUSTOM_CSS = """
             --ai-studio-primary-hover: #1557b0;
         }
         
-        /* Settings panel styling - Google AI Studio style */
+        /* Settings panel styling */
         .settings-panel {
-            background-color: var(--ai-studio-panel-bg);
-            border-left: 1px solid var(--ai-studio-border);
-            padding: 1.5rem;
+            padding: 1rem;
             height: 100%;
             position: sticky;
             top: 0;
@@ -27,7 +25,6 @@ CUSTOM_CSS = """
         .settings-panel h3 {
             font-size: 0.875rem;
             font-weight: 500;
-            color: var(--ai-studio-text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 1rem;
@@ -40,9 +37,8 @@ CUSTOM_CSS = """
             margin-bottom: 1.5rem;
         }
         
-        /* Card-like containers */
+        /* Card-like containers - respect theme */
         .stContainer > div {
-            background-color: var(--ai-studio-panel-bg);
             padding: 1.5rem;
             border-radius: 8px;
             border: 1px solid var(--ai-studio-border);
@@ -55,28 +51,24 @@ CUSTOM_CSS = """
             border-radius: 4px;
             font-weight: 500;
             transition: all 0.2s ease;
-            border: 1px solid var(--ai-studio-border);
             padding: 0.625rem 1rem;
-            background-color: var(--ai-studio-panel-bg);
-            color: var(--ai-studio-text);
             font-size: 0.875rem;
         }
         
         .stButton > button:hover {
-            background-color: #f8f9fa;
             box-shadow: 0 1px 3px rgba(0,0,0,0.12);
         }
         
         /* Primary button - Google blue */
         button[kind="primary"] {
-            background-color: var(--ai-studio-primary);
-            color: white;
-            border: none;
+            background-color: var(--ai-studio-primary) !important;
+            color: white !important;
+            border: none !important;
         }
         
         button[kind="primary"]:hover {
-            background-color: var(--ai-studio-primary-hover);
-            box-shadow: 0 2px 4px rgba(26, 115, 232, 0.3);
+            background-color: var(--ai-studio-primary-hover) !important;
+            box-shadow: 0 2px 4px rgba(26, 115, 232, 0.3) !important;
         }
         
         /* Status indicators */
@@ -108,7 +100,6 @@ CUSTOM_CSS = """
         /* Better text area - Material Design */
         .stTextArea > div > div > textarea {
             border-radius: 4px;
-            border: 1px solid var(--ai-studio-border);
             font-size: 0.875rem;
         }
         
@@ -121,7 +112,6 @@ CUSTOM_CSS = """
         /* Selectbox styling */
         .stSelectbox > div > div > select {
             border-radius: 4px;
-            border: 1px solid var(--ai-studio-border);
             font-size: 0.875rem;
         }
         
@@ -148,11 +138,6 @@ CUSTOM_CSS = """
             background-color: var(--ai-studio-primary);
         }
         
-        /* Remove extra spacing from markdown breaks */
-        br {
-            display: none;
-        }
-        
         /* Chat layout styling */
         .stChatMessage {
             margin-bottom: 1rem;
@@ -168,22 +153,15 @@ CUSTOM_CSS = """
             scroll-behavior: smooth;
         }
         
-        /* Ensure chat input container stays at bottom */
+        /* Ensure chat input container stays at bottom - theme aware */
         div[data-testid="stChatInputContainer"],
         div[data-testid="stChatInputContainer"] > div {
             position: sticky !important;
             bottom: 0 !important;
-            background-color: white !important;
             z-index: 100 !important;
             padding-top: 1rem !important;
             border-top: 1px solid var(--ai-studio-border) !important;
             margin-top: auto !important;
-        }
-        
-        /* Dark mode support for chat input */
-        [data-theme="dark"] div[data-testid="stChatInputContainer"],
-        [data-theme="dark"] div[data-testid="stChatInputContainer"] > div {
-            background-color: #0e1117 !important;
         }
         
         /* Custom scrollbar for chat messages */
@@ -229,4 +207,6 @@ CUSTOM_CSS = """
 PROMPT_WOMEN = """Keep the facial features of the person in the uploaded image exactly consistent. Dress her in a professional, **fitted black business suit (blazer) with a crisp white blouse**. Background: Place the subject against a clean, solid dark gray studio photography backdrop. The background should have a subtle gradient, slightly lighter behind the subject and darker towards the edges (vignette effect). There should be no other objects. Photography Style: Shot on a Sony A7III with an 85mm f/1.4 lens, creating a flattering portrait compression. Lighting: Use a classic three-point lighting setup. The main key light should create soft, defining shadows on the face. A subtle rim light should separate the subject's shoulders and hair from the dark background. Crucial Details: Render natural skin texture with visible pores, not an airbrushed look. Add natural catchlights to the eyes. The fabric of the suit should show a subtle wool texture. Final image should be an ultra-realistic, 8k professional headshot."""
 
 PROMPT_MEN = """Keep the facial features of the person in the uploaded image exactly consistent . Dress them in a professional  black business suit  with a white shirt  and a tie, similar to the reference image. Background : Place the subject against a clean, solid dark gray studio photography backdrop . The background should have a subtle gradient , slightly lighter behind the subject and darker towards the edges (vignette effect). There should be no other objects. Photography Style : Shot on a Sony A7III with an 85mm f/1.4 lens , creating a flattering portrait compression. Lighting : Use a classic three-point lighting setup . The main key light should create soft, defining shadows on the face. A subtle rim light should separate the subject's shoulders and hair from the dark background. Crucial Details : Render natural skin texture with visible pores , not an airbrushed look. Add natural catchlights to the eyes . The fabric of the suit should show a subtle wool texture.Final image should be an ultra-realistic, 8k professional headshot."""
+
+PROMPT_CUSTOM = """Опишіть детально, що ви хочете згенерувати. Можна вказати стиль, композицію, кольори, атмосферу та інші деталі."""
 
