@@ -14,21 +14,6 @@ CUSTOM_CSS = """
             --ai-studio-primary-hover: #1557b0;
         }
         
-        /* Main title styling */
-        .main-title {
-            text-align: center;
-            padding: 1rem 0;
-            margin-bottom: 1rem;
-        }
-        
-        /* Subtitle styling */
-        .subtitle {
-            text-align: center;
-            color: var(--ai-studio-text-secondary);
-            font-size: 1.1rem;
-            margin-bottom: 2rem;
-        }
-        
         /* Settings panel styling - Google AI Studio style */
         .settings-panel {
             background-color: var(--ai-studio-panel-bg);

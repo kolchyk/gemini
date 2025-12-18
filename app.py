@@ -22,14 +22,6 @@ st.set_page_config(
 # Custom CSS for modern UI
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# Header container
-with st.container():
-    st.markdown('<div class="main-title">', unsafe_allow_html=True)
-    st.title("🍌 NanaBanana for Darnytsia")
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('<p class="subtitle">Завантажте одне або кілька референсних зображень та введіть промпт для генерації нового зображення</p>', unsafe_allow_html=True)
-
-
 # Initialize session state for research agent
 if 'research_interaction_id' not in st.session_state:
     st.session_state['research_interaction_id'] = None
@@ -72,52 +64,24 @@ with tab1:
     col_main, col_settings = st.columns([3, 1])
     
     with col_main:
-        # Quick start guide
-        with st.expander("📖 Швидкий старт", expanded=False):
-            st.markdown("""
-            **Як користуватись:**
-            1. **Завантажте референси** (краще 1–3 фото обличчя, схожий ракурс/світло)
-            2. **Оберіть шаблон** (Жінки/Чоловіки) і **відредагуйте промпт** під задачу
-            3. Натисніть **«Згенерувати зображення»** → потім **«Завантажити»**
-            
-            **Порада:** якщо результат не влучив — спробуйте уточнити одяг/фон/світло або додайте ще один референс.
-            """)
-        
-        st.markdown("---")
         
         # Section 1: Reference image upload (top)
         st.subheader("📤 Крок 1: Референсні зображення")
         uploaded_files = st.file_uploader(
-            "Завантажте одне або кілька референсних зображень (опціонально)",
+            "Референсні зображення (опціонально)",
             type=['jpg', 'jpeg', 'png', 'bmp', 'gif'],
             accept_multiple_files=True,
-            help=(
-                "Рекомендовано: 1–3 референси з обличчям/портретом. "
-                "Чим ближче ракурс і освітлення до бажаного результату — тим краще. "
-                "Можна генерувати без референсів, але промпт обов'язковий."
-            ),
+            help="Рекомендовано: 1–3 референси з обличчям. Промпт обов'язковий.",
             key="reference_images"
         )
-        st.caption(
-            "💡 Підказка: якщо референсів немає — генерація можлива, але схожість/стабільність результату може бути гіршою."
-        )
         
-        # Display uploaded reference images immediately
+        # Display uploaded reference images immediately (as thumbnails)
         if uploaded_files:
             num_files = len(uploaded_files)
-            st.markdown("---")
-            if num_files == 1:
-                st.caption(f"✅ Завантажено 1 референсне зображення")
-                st.image(uploaded_files[0], caption="Референсне зображення", width='stretch')
-            else:
-                st.caption(f"✅ Завантажено {num_files} референсних зображень")
-                # Display images in columns for better layout
-                cols = st.columns(min(3, num_files))
-                for idx, uploaded_file in enumerate(uploaded_files):
-                    with cols[idx % len(cols)]:
-                        st.image(uploaded_file, caption=f"Референс {idx + 1}: {uploaded_file.name}", width='stretch')
-        
-        st.markdown("---")
+            cols = st.columns(min(4, num_files))
+            for idx, uploaded_file in enumerate(uploaded_files):
+                with cols[idx % len(cols)]:
+                    st.image(uploaded_file, caption=f"Реф. {idx + 1}", use_container_width=True)
 
         # Section 2: Prompt input (middle)
         st.subheader("✍️ Крок 2: Промпт")
@@ -167,13 +131,10 @@ with tab1:
         # Text area for prompt editing - use dynamic key based on prompt type
         prompt_key = f"prompt_text_area_{st.session_state['prompt_type']}"
         prompt = st.text_area(
-            "Опишіть, що ви хочете згенерувати:",
+            "Промпт:",
             value=current_prompt_value,
             height=200,
-            placeholder="Наприклад: Keep the facial features of the person in the uploaded image exactly consistent...",
-            help=(
-                "Порада: краще описувати: (1) що незмінне (обличчя), (2) одяг/стиль, (3) фон, (4) світло/камера, (5) що заборонено."
-            ),
+            placeholder="Опишіть що згенерувати...",
             key=prompt_key
         )
 
@@ -196,8 +157,6 @@ with tab1:
         else:
             st.session_state['edited_prompt_men'] = prompt
         
-        st.markdown("---")
-        
         # Generate button - more prominent placement
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
@@ -206,22 +165,20 @@ with tab1:
     # Right settings panel
     with col_settings:
         st.markdown('<div class="settings-panel">', unsafe_allow_html=True)
-        st.markdown("### Параметри генерації")
+        st.markdown("### Параметри")
         
         aspect_ratio = st.selectbox(
-            "Співвідношення сторін:",
+            "Співвідношення:",
             options=["1:1", "16:9", "9:16", "4:3", "3:4"],
             index=["1:1", "16:9", "9:16", "4:3", "3:4"].index(st.session_state['image_aspect_ratio']),
-            help="Виберіть співвідношення сторін для згенерованого зображення",
             key="image_aspect_ratio_selector"
         )
         st.session_state['image_aspect_ratio'] = aspect_ratio
         
         resolution = st.selectbox(
-            "Роздільна здатність:",
+            "Роздільність:",
             options=["1K", "2K", "4K"],
             index=["1K", "2K", "4K"].index(st.session_state['image_resolution']),
-            help="Виберіть роздільну здатність зображення (вища = краща якість, але довше генерація)",
             key="image_resolution_selector"
         )
         st.session_state['image_resolution'] = resolution
@@ -232,30 +189,9 @@ with tab1:
             max_value=1.0,
             value=st.session_state['image_temperature'],
             step=0.05,
-            help="Контролює випадковість генерації (0.0 = детерміновано, 1.0 = більше варіацій)",
             key="image_temperature_slider"
         )
         st.session_state['image_temperature'] = temperature
-        
-        st.divider()
-        
-        with st.expander("💡 Підказки"):
-            st.markdown("""
-            **Для максимальної схожості:**
-            - Додайте *keep facial features exactly consistent*
-            - Опишіть ракурс (front/3-4 view)
-            
-            **Для бізнес-портрета:**
-            - Уточніть *studio backdrop*
-            - Додайте *three-point lighting*
-            - Вкажіть *85mm lens*
-            
-            **Щоб прибрати артефакти:**
-            - Додайте *no extra people, no text, no watermark*
-            
-            **Якщо фон "брудний":**
-            - Вкажіть *clean solid background, subtle gradient, no objects*
-            """)
         
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -271,12 +207,6 @@ with tab1:
             if not prompt or not prompt.strip():
                 st.error("⚠️ Будь ласка, введіть промпт. Промпт є обов'язковим для генерації зображення.")
                 st.stop()
-            
-            # Source images are optional - just show info if provided
-            if uploaded_files and len(uploaded_files) > 0:
-                st.info(f"ℹ️ Буде використано {len(uploaded_files)} референсних зображень")
-            
-            st.markdown("---")
             
             # Section 3: Result display (bottom)
             st.subheader("🎨 Результат генерації")
@@ -421,13 +351,6 @@ with tab1:
                 if image_bytes:
                     # Display generated image
                     st.success("🎉 Зображення успішно згенеровано!")
-                    st.info(
-                        "**Що далі:** натисніть **«Завантажити зображення»** нижче.\n\n"
-                        "**Як покращити результат:**\n"
-                        "- додайте 1–2 референси з ближчим ракурсом;\n"
-                        "- уточніть фон (solid/gradient) і світло (three-point);\n"
-                        "- додайте обмеження: *no text, no watermark, no extra people*."
-                    )
                     st.image(image_bytes, caption="Згенероване зображення", width='stretch')
                     
                     # Download button
@@ -467,7 +390,6 @@ with tab1:
     # Display previously generated image if exists
     with col_main:
         if 'generated_image' in st.session_state and not generate_button:
-            st.markdown("---")
             st.subheader("📸 Останнє згенероване зображення")
             st.image(st.session_state['generated_image'], caption="Останнє згенероване зображення", width='stretch')
             col1, col2, col3 = st.columns([1, 2, 1])
@@ -487,27 +409,15 @@ with tab2:
     
     with col_main:
         st.subheader("🔍 Deep Research Agent")
-        st.markdown("Використовуйте Deep Research Agent для глибокого дослідження тем з автоматичним збором та аналізом інформації")
         
-        with st.expander("📖 Як користуватись", expanded=False):
-            st.markdown("""
-            **Інструкція:**
-            1. **Введіть запит** для дослідження (наприклад, про історію технологій, події, аналіз даних)
-            2. Натисніть **«Почати дослідження»** — агент почне роботу у фоновому режимі
-            3. **Моніторинг статусу** — система автоматично перевіряє прогрес кожні 10 секунд
-            4. Коли дослідження завершиться, ви побачите **фінальний звіт** з результатами
-            """)
-        
-        st.markdown("---")
         
         # Input section
         st.subheader("📝 Запит для дослідження")
         research_query = st.text_area(
-            "Введіть тему або питання для дослідження:",
+            "Запит для дослідження:",
             value=st.session_state['research_query'] if st.session_state['research_query'] else "",
             height=150,
-            placeholder="Наприклад: Research the history of the Google TPUs with a focus on 2025 and 2026.",
-            help="Опишіть тему дослідження детально для кращих результатів.",
+            placeholder="Введіть тему або питання...",
             key="research_query_input"
         )
         
@@ -536,8 +446,6 @@ with tab2:
                 except Exception as e:
                     st.error(f"❌ Помилка: {str(e)}")
         
-        st.markdown("---")
-        
         # Status and results section
         if st.session_state['research_interaction_id']:
             st.subheader("📊 Статус дослідження")
@@ -559,8 +467,6 @@ with tab2:
                 st.error(f"❌ **Статус:** {current_status.capitalize()}")
             else:
                 st.info(f"ℹ️ **Статус:** {current_status}")
-            
-            st.markdown("---")
             
             # Results display
             if st.session_state['research_result']:
@@ -721,18 +627,7 @@ with tab3:
     
     with col_main:
         st.subheader("💬 Чат з Gemini 3 Pro")
-        st.markdown("Спілкуйтеся з Gemini 3 Pro для отримання детальних відповідей та аналізу")
         
-        with st.expander("📖 Як користуватись", expanded=False):
-            st.markdown("""
-            **Інструкція:**
-            1. **Введіть повідомлення** в поле внизу сторінки
-            2. Натисніть **Enter** або кнопку відправки — Gemini 3 Pro відповість у режимі реального часу
-            3. **Налаштування мислення:** оберіть рівень мислення (low/high) для контролю глибини аналізу
-            4. **Історія чату:** всі повідомлення зберігаються протягом сесії
-            """)
-        
-        st.markdown("---")
         
         # Create scrollable container for chat messages
         chat_messages_container = st.container()
@@ -823,13 +718,12 @@ with tab3:
     # Right settings panel
     with col_settings:
         st.markdown('<div class="settings-panel">', unsafe_allow_html=True)
-        st.markdown("### Налаштування моделі")
+        st.markdown("### Налаштування")
         
         thinking_level = st.selectbox(
-            "Рівень мислення:",
+            "Мислення:",
             options=["low", "high"],
             index=0 if st.session_state['chat_thinking_level'] == 'low' else 1,
-            help="Low = швидші відповіді, High = глибший аналіз та мислення",
             key="thinking_level_selector"
         )
         st.session_state['chat_thinking_level'] = thinking_level
@@ -840,20 +734,11 @@ with tab3:
             max_value=2.0,
             value=st.session_state['chat_temperature'],
             step=0.1,
-            help="Контролює випадковість відповідей (0.0 = детерміновано, 2.0 = більше варіацій)",
             key="chat_temperature_slider"
         )
         st.session_state['chat_temperature'] = temperature
         
-        st.divider()
-        
-        st.markdown("**Параметри генерації:**")
-        st.caption(f"Max tokens: 8192")
-        st.caption(f"Model: gemini-3-pro-preview")
-        
-        st.divider()
-        
-        if st.button("🧹 Очистити історію чату", width='stretch', use_container_width=True):
+        if st.button("🧹 Очистити чат", width='stretch', use_container_width=True):
             st.session_state['gemini_chat_history'] = []
             st.rerun()
         
