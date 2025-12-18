@@ -14,7 +14,7 @@ from gemini_image_generator.research_agent import start_research, check_research
 
 # Page configuration
 st.set_page_config(
-    page_title="NanaBanana for Darnytsia",
+    page_title="Darnytsia Gemini Hub",
     page_icon="🎨",
     layout="wide"
 )

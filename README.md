@@ -1,4 +1,4 @@
-# NanaBanana for Darnytsia
+# Darnytsia Gemini Hub
 
 Веб-додаток для генерації зображень за допомогою Google Gemini API.
 

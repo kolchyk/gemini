@@ -1,4 +1,4 @@
-"""Configuration constants and styles for NanaBanana for Darnytsia."""
+"""Configuration constants and styles for Darnytsia Gemini Hub."""
 
 # Custom CSS for modern UI - Google AI Studio style
 CUSTOM_CSS = """
