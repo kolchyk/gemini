@@ -154,14 +154,14 @@ with tab1:
         st.markdown("---")
         if num_files == 1:
             st.caption(f"✅ Завантажено 1 референсне зображення")
-            st.image(uploaded_files[0], caption="Референсне зображення", use_container_width=True)
+            st.image(uploaded_files[0], caption="Референсне зображення", width='stretch')
         else:
             st.caption(f"✅ Завантажено {num_files} референсних зображень")
             # Display images in columns for better layout
             cols = st.columns(min(3, num_files))
             for idx, uploaded_file in enumerate(uploaded_files):
                 with cols[idx % len(cols)]:
-                    st.image(uploaded_file, caption=f"Референс {idx + 1}: {uploaded_file.name}", use_container_width=True)
+                    st.image(uploaded_file, caption=f"Референс {idx + 1}: {uploaded_file.name}", width='stretch')
     
     st.markdown("---")
 
@@ -225,14 +225,14 @@ with tab1:
 
     col_a, col_b = st.columns([1, 1])
     with col_a:
-        if st.button("↩️ Скинути промпт до шаблону", use_container_width=True):
+        if st.button("↩️ Скинути промпт до шаблону", width='stretch'):
             if st.session_state['prompt_type'] == 'women':
                 st.session_state['edited_prompt_women'] = PROMPT_WOMEN
             else:
                 st.session_state['edited_prompt_men'] = PROMPT_MEN
             st.rerun()
     with col_b:
-        if st.button("🧹 Очистити останній результат", use_container_width=True):
+        if st.button("🧹 Очистити останній результат", width='stretch'):
             st.session_state.pop('generated_image', None)
             st.rerun()
     
@@ -247,7 +247,7 @@ with tab1:
     # Generate button - more prominent placement
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        generate_button = st.button("🚀 Згенерувати зображення", type="primary", use_container_width=True)
+        generate_button = st.button("🚀 Згенерувати зображення", type="primary", width='stretch')
 
     # Generate image when button is clicked
     if generate_button:
@@ -412,7 +412,7 @@ with tab1:
                     "- уточніть фон (solid/gradient) і світло (three-point);\n"
                     "- додайте обмеження: *no text, no watermark, no extra people*."
                 )
-                st.image(image_bytes, caption="Згенероване зображення", use_container_width=True)
+                st.image(image_bytes, caption="Згенероване зображення", width='stretch')
                 
                 # Download button
                 col1, col2, col3 = st.columns([1, 2, 1])
@@ -422,7 +422,7 @@ with tab1:
                         data=image_bytes,
                         file_name="generated_image.jpg",
                         mime="image/jpeg",
-                        use_container_width=True
+                        width='stretch'
                     )
                 
                 # Store in session state for persistence
@@ -452,7 +452,7 @@ with tab1:
     if 'generated_image' in st.session_state and not generate_button:
         st.markdown("---")
         st.subheader("📸 Останнє згенероване зображення")
-        st.image(st.session_state['generated_image'], caption="Останнє згенероване зображення", use_container_width=True)
+        st.image(st.session_state['generated_image'], caption="Останнє згенероване зображення", width='stretch')
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             st.download_button(
@@ -460,7 +460,7 @@ with tab1:
                 data=st.session_state['generated_image'],
                 file_name="generated_image.jpg",
                 mime="image/jpeg",
-                use_container_width=True
+                width='stretch'
             )
 
 # ========== TAB 2: DEEP RESEARCH AGENT ==========
@@ -492,7 +492,7 @@ with tab2:
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        start_research_button = st.button("🚀 Почати дослідження", type="primary", use_container_width=True)
+        start_research_button = st.button("🚀 Почати дослідження", type="primary", width='stretch')
     
     # Handle start research button
     if start_research_button:
@@ -550,7 +550,7 @@ with tab2:
         # Control buttons
         control_col1, control_col2, control_col3 = st.columns([1, 1, 1])
         with control_col1:
-            if st.button("🔄 Оновити статус", use_container_width=True):
+            if st.button("🔄 Оновити статус", width='stretch'):
                 try:
                     client = get_gemini_client()
                     status, result, error = check_research_status(interaction_id, client)
@@ -567,12 +567,12 @@ with tab2:
                     st.error(f"❌ Помилка: {str(e)}")
         
         with control_col2:
-            if st.button("⏹️ Зупинити моніторинг", use_container_width=True):
+            if st.button("⏹️ Зупинити моніторинг", width='stretch'):
                 st.session_state['research_auto_polling'] = False
                 st.rerun()
         
         with control_col3:
-            if st.button("🔄 Відновити моніторинг", use_container_width=True):
+            if st.button("🔄 Відновити моніторинг", width='stretch'):
                 st.session_state['research_auto_polling'] = True
                 st.rerun()
             
@@ -664,7 +664,7 @@ with tab2:
                     data=result_text.encode('utf-8'),
                     file_name=f"research_report_{interaction_id[:8]}.md",
                     mime="text/markdown",
-                    use_container_width=True
+                    width='stretch'
                 )
         
         elif current_status in ["failed", "cancelled"]:
@@ -707,18 +707,23 @@ with tab3:
         st.session_state['chat_thinking_level'] = thinking_level
     
     with col_config2:
-        if st.button("🧹 Очистити історію чату", use_container_width=True):
+        if st.button("🧹 Очистити історію чату", width='stretch'):
             st.session_state['gemini_chat_history'] = []
             st.rerun()
     
     st.markdown("---")
     
-    # Display chat history
-    for message in st.session_state['gemini_chat_history']:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+    # Create scrollable container for chat messages
+    chat_messages_container = st.container()
+    with chat_messages_container:
+        st.markdown('<div class="chat-messages-scrollable">', unsafe_allow_html=True)
+        # Display chat history
+        for message in st.session_state['gemini_chat_history']:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+        st.markdown('</div>', unsafe_allow_html=True)
     
-    # Chat input
+    # Chat input (will be rendered at bottom by Streamlit, CSS will keep it fixed)
     if prompt := st.chat_input("Введіть ваше повідомлення..."):
         # Add user message to history
         st.session_state['gemini_chat_history'].append({"role": "user", "content": prompt})

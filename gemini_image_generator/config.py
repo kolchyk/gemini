@@ -110,6 +110,59 @@ CUSTOM_CSS = """
         br {
             display: none;
         }
+        
+        /* Chat layout styling */
+        /* Style chat messages */
+        .stChatMessage {
+            margin-bottom: 1rem;
+        }
+        
+        /* Create scrollable container for chat messages */
+        .chat-messages-scrollable {
+            max-height: calc(100vh - 400px);
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 1rem 0;
+            margin-bottom: 1rem;
+            scroll-behavior: smooth;
+        }
+        
+        /* Ensure chat input container stays at bottom */
+        div[data-testid="stChatInputContainer"],
+        div[data-testid="stChatInputContainer"] > div {
+            position: sticky !important;
+            bottom: 0 !important;
+            background-color: white !important;
+            z-index: 100 !important;
+            padding-top: 1rem !important;
+            border-top: 1px solid #e0e0e0 !important;
+            margin-top: auto !important;
+        }
+        
+        /* Dark mode support for chat input */
+        [data-theme="dark"] div[data-testid="stChatInputContainer"],
+        [data-theme="dark"] div[data-testid="stChatInputContainer"] > div {
+            background-color: #0e1117 !important;
+        }
+        
+        /* Custom scrollbar for chat messages */
+        .chat-messages-scrollable::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .chat-messages-scrollable::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        .chat-messages-scrollable::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        
+        .chat-messages-scrollable::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
     </style>
 """
 
