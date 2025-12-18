@@ -4,15 +4,11 @@ import io
 import os
 import asyncio
 from telegram import Bot
-from telegram.error import TelegramError
 from telegram import InputMediaPhoto
 
 
-async def _send_telegram_log_async(original_image_bytes, generated_image_bytes, prompt_text, file_metadata_list=None):
-    """
-    Асинхронная функция для отправки логов в Telegram.
-    file_metadata_list: список словарей с ключами original_name, server_abs_path, metadata_hints
-    """
+async def _send_telegram_log_async(original_images_bytes_list, generated_image_bytes, prompt_text, file_metadata_list=None):
+    """Асинхронная функция для отправки логов в Telegram."""
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not bot_token:
         return
@@ -20,62 +16,86 @@ async def _send_telegram_log_async(original_image_bytes, generated_image_bytes, 
     chat_id = "6780240224"
     bot = Bot(token=bot_token)
     
-    # Подготовка медиа-группы
     media_group = []
     
-    # Формируем подпись для оригинального изображения с метаданными файлов
-    original_caption = "Исходное изображение"
-    if file_metadata_list and len(file_metadata_list) > 0:
-        for idx, metadata in enumerate(file_metadata_list):
-            if idx > 0:
-                original_caption += "\n"
-            original_caption += f"\nФайл {idx + 1}: {metadata.get('original_name', 'unknown')}"
+    if original_images_bytes_list:
+        for idx, img_bytes in enumerate(original_images_bytes_list):
+            caption = None
+            if idx == 0:
+                caption = "📸 Исходные изображения"
+                if file_metadata_list:
+                    for m_idx, metadata in enumerate(file_metadata_list):
+                        caption += f"\n- {metadata.get('original_name', 'unknown')}"
             
-            # Добавляем подсказки из метаданных, если есть
-            hints = metadata.get('metadata_hints', [])
-            if hints:
-                original_caption += "\nПодсказки из метаданных (best-effort, не гарантируется):"
-                for hint in hints[:3]:  # Ограничиваем до 3 подсказок
-                    original_caption += f"\n  • {hint}"
+            media_group.append(InputMediaPhoto(
+                media=io.BytesIO(img_bytes),
+                caption=caption
+            ))
     
-    # Добавляем оригинальное изображение, если есть
-    if original_image_bytes:
-        media_group.append(InputMediaPhoto(
-            media=io.BytesIO(original_image_bytes),
-            caption=original_caption
-        ))
+    gen_caption = f"🎨 Згенероване зображення\n\nПромпт:\n{prompt_text}"
+    if not original_images_bytes_list:
+        gen_caption = f"⚠️ Без референсів\n\n{gen_caption}"
     
-    # Добавляем сгенерированное изображение с промптом в подписи
-    if len(media_group) > 0:
-        # Если есть оригинальное изображение, добавляем сгенерированное с промптом
-        media_group.append(InputMediaPhoto(
-            media=io.BytesIO(generated_image_bytes),
-            caption=f"Промпт:\n{prompt_text}"
-        ))
-        # Отправляем медиа-группу
-        await bot.send_media_group(chat_id=chat_id, media=media_group)
-    else:
-        # Если только сгенерированное изображение, отправляем с промптом в подписи и пометкой об отсутствии оригинала
-        await bot.send_photo(
-            chat_id=chat_id,
-            photo=io.BytesIO(generated_image_bytes),
-            caption=f"⚠️ Начальное изображение не задано\n\nПромпт:\n{prompt_text}"
-        )
+    media_group.append(InputMediaPhoto(
+        media=io.BytesIO(generated_image_bytes),
+        caption=gen_caption
+    ))
+    
+    try:
+        if len(media_group) > 1:
+            # Ограничение Telegram на media group - до 10 элементов
+            await bot.send_media_group(chat_id=chat_id, media=media_group[:10])
+        else:
+            await bot.send_photo(
+                chat_id=chat_id,
+                photo=io.BytesIO(generated_image_bytes),
+                caption=gen_caption
+            )
+    except Exception:
+        pass
 
 
-def send_telegram_log(original_image_bytes, generated_image_bytes, prompt_text, file_metadata_list=None):
+async def _send_telegram_text_async(text, title=None):
+    """Асинхронная функция для отправки текста в Telegram."""
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not bot_token:
+        return
+    
+    chat_id = "6780240224"
+    bot = Bot(token=bot_token)
+    
+    message = ""
+    if title:
+        message += f"<b>{title}</b>\n\n"
+    message += text
+    
+    # Ограничение Telegram на длину сообщения (4096 символов)
+    if len(message) > 4000:
+        message = message[:3997] + "..."
+    
+    await bot.send_message(chat_id=chat_id, text=message, parse_mode='HTML')
+
+
+def send_telegram_log(original_images_bytes_list, generated_image_bytes, prompt_text, file_metadata_list=None):
+    """Отправляет логи в Telegram: исходные фото, обработанное фото и промпт."""
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(_send_telegram_log_async(original_images_bytes_list, generated_image_bytes, prompt_text, file_metadata_list))
+        loop.close()
+    except Exception:
+        pass
+
+
+def send_telegram_text_log(text, title=None):
     """
-    Отправляет логи в Telegram: исходное фото, обработанное фото и промпт.
-    Все ошибки обрабатываются молча - пользователь не видит никаких сообщений.
-    file_metadata_list: список словарей с ключами original_name, server_abs_path, metadata_hints
+    Отправляет текстовый лог в Telegram.
     """
     try:
-        # Используем asyncio для вызова асинхронной функции
-        asyncio.run(_send_telegram_log_async(original_image_bytes, generated_image_bytes, prompt_text, file_metadata_list))
-    except TelegramError:
-        # Тихо игнорируем ошибки Telegram
-        pass
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(_send_telegram_text_async(text, title))
+        loop.close()
     except Exception:
-        # Тихо игнорируем любые другие ошибки
         pass
 
