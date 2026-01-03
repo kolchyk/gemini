@@ -3,6 +3,7 @@ from google.genai import types
 import base64
 import os
 import mimetypes
+import re
 import time
 
 # Import from local modules
@@ -10,7 +11,6 @@ from gemini_image_generator.config import CUSTOM_CSS, PROMPT_WOMEN, PROMPT_MEN, 
 from gemini_image_generator.client import get_gemini_client
 from gemini_image_generator.file_utils import save_uploaded_file
 from gemini_image_generator.telegram_utils import send_telegram_log, send_telegram_text_log
-from gemini_image_generator.research_agent import start_research, check_research_status
 
 # Page configuration
 st.set_page_config(
@@ -22,19 +22,49 @@ st.set_page_config(
 # Custom CSS for modern UI
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-# Initialize session state for research agent
-if 'research_interaction_id' not in st.session_state:
-    st.session_state['research_interaction_id'] = None
-if 'research_query' not in st.session_state:
-    st.session_state['research_query'] = None
-if 'research_status' not in st.session_state:
-    st.session_state['research_status'] = None
-if 'research_auto_polling' not in st.session_state:
-    st.session_state['research_auto_polling'] = False
-if 'research_result' not in st.session_state:
-    st.session_state['research_result'] = None
-if 'research_error' not in st.session_state:
-    st.session_state['research_error'] = None
+def get_text(outputs):
+    return "\n".join(
+        output.text for output in (outputs or []) if hasattr(output, 'text') and output.text
+    ) or ""
+
+
+def parse_tasks(text):
+    return [
+        {"num": match.group(1), "text": match.group(2).strip().replace('\n', ' ')}
+        for match in re.finditer(
+            r'^(\d+)[\.\)\-]\s*(.+?)(?=\n\d+[\.\)\-]|\n\n|\Z)',
+            text,
+            re.MULTILINE | re.DOTALL
+        )
+    ]
+
+
+def wait_for_completion(client, interaction_id, timeout=300):
+    progress, status, elapsed = st.progress(0), st.empty(), 0
+    while elapsed < timeout:
+        interaction = client.interactions.get(interaction_id)
+        if interaction.status != "in_progress":
+            progress.progress(100)
+            return interaction
+        elapsed += 3
+        progress.progress(min(90, int(elapsed / timeout * 100)))
+        status.text(f"⏳ {elapsed}s...")
+        time.sleep(3)
+    return client.interactions.get(interaction_id)
+
+
+# Initialize session state for research planner
+for key in [
+    "plan_id",
+    "plan_text",
+    "tasks",
+    "research_id",
+    "research_text",
+    "synthesis_text",
+    "infographic",
+]:
+    if key not in st.session_state:
+        st.session_state[key] = [] if key == "tasks" else None
 
 # Initialize session state for Gemini 3 Pro chat
 if 'gemini_chat_history' not in st.session_state:
@@ -422,218 +452,166 @@ with tab1:
 
 # ========== TAB 2: DEEP RESEARCH AGENT ==========
 with tab2:
-    # Create two-column layout: main content (3) and settings panel (1)
     col_main, col_settings = st.columns([3, 1])
-    
+
     with col_main:
-        st.subheader("🔍 Deep Research Agent")
-        
-        
-        # Input section
-        st.subheader("📝 Запит для дослідження")
-        research_query = st.text_area(
-            "Запит для дослідження:",
-            value=st.session_state['research_query'] if st.session_state['research_query'] else "",
-            height=150,
-            placeholder="Введіть тему або питання...",
-            key="research_query_input"
+        st.subheader("🔍 Deep Research Planner")
+
+        # Phase 1: Plan
+        research_goal = st.text_area(
+            "📝 Research Goal",
+            placeholder="e.g., Research B2B HR SaaS market in Germany",
+            key="research_goal_input"
         )
-        
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            start_research_button = st.button("🚀 Почати дослідження", type="primary", width='stretch')
-        
-        # Handle start research button
-        if start_research_button:
-            if not research_query or not research_query.strip():
-                st.error("⚠️ Будь ласка, введіть запит для дослідження")
-            else:
+        if st.button("📋 Generate Plan", disabled=not research_goal, type="primary"):
+            with st.spinner("Planning..."):
                 try:
                     client = get_gemini_client()
-                    interaction_id, status = start_research(research_query.strip(), client)
-                    st.session_state['research_interaction_id'] = interaction_id
-                    st.session_state['research_query'] = research_query.strip()
-                    st.session_state['research_status'] = status
-                    st.session_state['research_auto_polling'] = True
-                    st.session_state['research_result'] = None
-                    st.session_state['research_error'] = None
-                    st.session_state['research_logged_to_telegram'] = False
-                    st.session_state['research_last_poll_time'] = 0  # Reset poll timer
-                    st.success(f"✅ Дослідження розпочато! Interaction ID: {interaction_id}")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"❌ Помилка: {str(e)}")
-        
-        # Status and results section
-        if st.session_state['research_interaction_id']:
-            st.subheader("📊 Статус дослідження")
-            
-            interaction_id = st.session_state['research_interaction_id']
-            current_status = st.session_state['research_status']
-            
-            # Display interaction ID
-            st.caption(f"**Interaction ID:** `{interaction_id}`")
-            
-            # Status display
-            if current_status == "pending":
-                st.info("⏳ **Статус:** Очікування...")
-            elif current_status == "processing":
-                st.info("🔄 **Статус:** Обробка...")
-            elif current_status == "completed":
-                st.success("✅ **Статус:** Завершено!")
-            elif current_status in ["failed", "cancelled"]:
-                st.error(f"❌ **Статус:** {current_status.capitalize()}")
-            else:
-                st.info(f"ℹ️ **Статус:** {current_status}")
-            
-            # Results display
-            if st.session_state['research_result']:
-                st.subheader("📄 Фінальний звіт")
-                
-                result_text = st.session_state['research_result']
-                
-                # Display result in expandable section
-                with st.expander("🔍 Переглянути звіт", expanded=True):
-                    st.markdown(result_text)
-                
-                # Download button
-                col1, col2, col3 = st.columns([1, 2, 1])
-                with col2:
-                    st.download_button(
-                        label="💾 Завантажити звіт",
-                        data=result_text.encode('utf-8'),
-                        file_name=f"research_report_{interaction_id[:8]}.md",
-                        mime="text/markdown",
-                        width='stretch'
+                    interaction = client.interactions.create(
+                        model="gemini-3-flash-preview",
+                        input=(
+                            f"Create a numbered research plan for: {research_goal}\n\n"
+                            "Format: 1. [Task] - [Details]\n\nInclude 5-8 specific tasks."
+                        ),
+                        tools=[{"type": "google_search"}],
+                        store=True,
                     )
-            
-            elif current_status in ["failed", "cancelled"]:
-                st.warning("⚠️ Дослідження завершилося з помилкою або було скасовано.")
-                if st.session_state['research_error']:
-                    st.error(f"**Деталі помилки:** {st.session_state['research_error']}")
-            
-            elif current_status == "completed" and not st.session_state['research_result']:
-                st.info("ℹ️ Дослідження завершено, але результат ще не отримано. Натисніть «Оновити статус».")
-        
-        else:
-            st.info("💡 Введіть запит вище та натисніть «Почати дослідження», щоб розпочати роботу з Deep Research Agent.")
-    
-    # Right settings panel
-    with col_settings:
-        st.markdown("### Управління")
-        
-        if st.session_state['research_interaction_id']:
-            interaction_id = st.session_state['research_interaction_id']
-            current_status = st.session_state['research_status']
-            
-            st.markdown(f"**Interaction ID:**")
-            st.code(interaction_id[:16] + "...", language=None)
-            
-            st.divider()
-            
-            # Auto-polling status
-            if st.session_state['research_auto_polling']:
-                st.success("🔄 Автоматичне оновлення: Увімкнено")
-            else:
-                st.info("⏸️ Автоматичне оновлення: Вимкнено")
-            
-            st.divider()
-            
-            # Control buttons
-            if st.button("🔄 Оновити статус", width='stretch', use_container_width=True):
-                try:
-                    client = get_gemini_client()
-                    status, result, error = check_research_status(interaction_id, client)
-                    st.session_state['research_status'] = status
-                    if result:
-                        st.session_state['research_result'] = result
-                        if not st.session_state.get('research_logged_to_telegram'):
-                            send_telegram_text_log(result, f"🔍 Deep Research: {st.session_state['research_query']}")
-                            st.session_state['research_logged_to_telegram'] = True
-                    if error:
-                        st.session_state['research_error'] = error
-                    st.rerun()
+                    plan_text = get_text(interaction.outputs)
+                    st.session_state.plan_id = interaction.id
+                    st.session_state.plan_text = plan_text
+                    st.session_state.tasks = parse_tasks(plan_text)
+                    st.session_state.research_id = None
+                    st.session_state.research_text = None
+                    st.session_state.synthesis_text = None
+                    st.session_state.infographic = None
                 except Exception as e:
-                    st.error(f"❌ Помилка: {str(e)}")
-            
-            if st.session_state['research_auto_polling']:
-                if st.button("⏹️ Зупинити моніторинг", width='stretch', use_container_width=True):
-                    st.session_state['research_auto_polling'] = False
-                    st.rerun()
-            else:
-                if st.button("🔄 Відновити моніторинг", width='stretch', use_container_width=True):
-                    st.session_state['research_auto_polling'] = True
-                    st.rerun()
-            
-            # Auto-polling logic
-            if st.session_state['research_auto_polling'] and current_status not in ["completed", "failed", "cancelled"]:
-                # Initialize last poll time if not exists
-                if 'research_last_poll_time' not in st.session_state:
-                    st.session_state['research_last_poll_time'] = 0
-                
-                current_time = time.time()
-                time_since_last_poll = current_time - st.session_state['research_last_poll_time']
-                
-                # Poll if 10 seconds have passed since last poll or if this is the first poll
-                if time_since_last_poll >= 10 or st.session_state['research_last_poll_time'] == 0:
+                    st.error(f"Error: {e}")
+
+        # Phase 2: Select & Research
+        if st.session_state.plan_text:
+            st.divider()
+            st.subheader("🔍 Select Tasks & Research")
+            selected = [
+                f"{task['num']}. {task['text']}"
+                for task in st.session_state.tasks
+                if st.checkbox(
+                    f"**{task['num']}.** {task['text']}",
+                    True,
+                    key=f"task_{task['num']}",
+                )
+            ]
+            st.caption(f"✅ {len(selected)}/{len(st.session_state.tasks)} selected")
+
+            if st.button("🚀 Start Deep Research", type="primary", disabled=not selected):
+                with st.spinner("Researching (2-5 min)..."):
                     try:
                         client = get_gemini_client()
-                        status, result, error = check_research_status(interaction_id, client)
-                        st.session_state['research_last_poll_time'] = current_time
-                        
-                        if status != current_status:
-                            st.session_state['research_status'] = status
-                            if result:
-                                st.session_state['research_result'] = result
-                                if not st.session_state.get('research_logged_to_telegram'):
-                                    send_telegram_text_log(result, f"🔍 Deep Research: {st.session_state['research_query']}")
-                                    st.session_state['research_logged_to_telegram'] = True
-                            if error:
-                                st.session_state['research_error'] = error
-                            st.rerun()
-                        elif result and not st.session_state['research_result']:
-                            # Status same but we got a result we didn't have before
-                            st.session_state['research_result'] = result
-                            if not st.session_state.get('research_logged_to_telegram'):
-                                send_telegram_text_log(result, f"🔍 Deep Research: {st.session_state['research_query']}")
-                                st.session_state['research_logged_to_telegram'] = True
-                            st.rerun()
-                        elif error and not st.session_state['research_error']:
-                            # Status same but we got an error we didn't have before
-                            st.session_state['research_error'] = error
-                            st.rerun()
-                        else:
-                            # Status unchanged, schedule auto-refresh using JavaScript
-                            st.markdown(
-                                f"""
-                                <script>
-                                    setTimeout(function() {{
-                                        window.location.reload();
-                                    }}, 10000);
-                                </script>
-                                """,
-                                unsafe_allow_html=True
-                            )
-                            st.caption("⏱️ Оновлення через 10 сек...")
+                        interaction = client.interactions.create(
+                            agent="deep-research-pro-preview-12-2025",
+                            input=(
+                                "Research these tasks thoroughly with sources:\n\n"
+                                + "\n\n".join(selected)
+                            ),
+                            previous_interaction_id=st.session_state.plan_id,
+                            background=True,
+                            store=True,
+                        )
+                        interaction = wait_for_completion(client, interaction.id)
+                        st.session_state.research_id = interaction.id
+                        st.session_state.research_text = get_text(interaction.outputs) or (
+                            f"Status: {interaction.status}"
+                        )
+                        st.rerun()
                     except Exception as e:
-                        st.warning(f"⚠️ Помилка: {str(e)}")
-                        st.session_state['research_auto_polling'] = False
-                else:
-                    # Show countdown until next poll
-                    seconds_until_next = int(10 - time_since_last_poll)
-                    st.markdown(
-                        f"""
-                        <script>
-                            setTimeout(function() {{
-                                window.location.reload();
-                            }}, {seconds_until_next * 1000});
-                        </script>
-                        """,
-                        unsafe_allow_html=True
-                    )
-                    st.caption(f"⏱️ Через {seconds_until_next} сек...")
-        else:
-            st.info("💡 Почніть дослідження, щоб побачити статус та управління тут.")
+                        st.error(f"Error: {e}")
+
+        if st.session_state.research_text:
+            st.divider()
+            st.subheader("📄 Research Results")
+            st.markdown(st.session_state.research_text)
+
+        # Phase 3: Synthesis + Infographic
+        if st.session_state.research_id:
+            if st.button("📊 Generate Executive Report", type="primary"):
+                with st.spinner("Synthesizing report..."):
+                    try:
+                        client = get_gemini_client()
+                        interaction = client.interactions.create(
+                            model="gemini-3-pro-preview",
+                            input=(
+                                "Create executive report with Summary, Findings, "
+                                "Recommendations, Risks:\n\n"
+                                f"{st.session_state.research_text}"
+                            ),
+                            previous_interaction_id=st.session_state.research_id,
+                            store=True,
+                        )
+                        st.session_state.synthesis_text = get_text(interaction.outputs)
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+                        st.stop()
+
+                with st.spinner("Creating TL;DR infographic..."):
+                    try:
+                        response = client.models.generate_content(
+                            model="gemini-3-pro-image-preview",
+                            contents=(
+                                "Create a whiteboard summary infographic for the following: "
+                                f"{st.session_state.synthesis_text}"
+                            ),
+                        )
+                        for part in response.candidates[0].content.parts:
+                            if hasattr(part, 'inline_data') and part.inline_data:
+                                st.session_state.infographic = part.inline_data.data
+                                break
+                    except Exception as e:
+                        st.warning(f"Infographic error: {e}")
+                st.rerun()
+
+        if st.session_state.synthesis_text:
+            st.divider()
+            st.markdown("## 📊 Executive Report")
+
+            if st.session_state.infographic:
+                st.markdown("### 🎨 TL;DR")
+                st.image(st.session_state.infographic, use_container_width=True)
+                st.divider()
+
+            st.markdown(st.session_state.synthesis_text)
+            st.download_button(
+                "📥 Download Report",
+                st.session_state.synthesis_text,
+                "research_report.md",
+                "text/markdown",
+            )
+
+        st.divider()
+        st.caption("[Gemini Interactions API](https://ai.google.dev/gemini-api/docs/interactions)")
+
+    with col_settings:
+        st.markdown("### How It Works")
+        st.markdown(
+            """
+            1. **Plan** → Gemini 3 Flash creates research tasks
+            2. **Select** → Choose which tasks to research
+            3. **Research** → Deep Research Agent investigates
+            4. **Synthesize** → Gemini 3 Pro writes report + TL;DR infographic
+
+            Each phase chains via `previous_interaction_id` for context.
+            """
+        )
+        if st.button("Reset", width='stretch', use_container_width=True):
+            for key in [
+                "plan_id",
+                "plan_text",
+                "tasks",
+                "research_id",
+                "research_text",
+                "synthesis_text",
+                "infographic",
+            ]:
+                st.session_state[key] = [] if key == "tasks" else None
+            st.rerun()
         
 # ========== TAB 3: GEMINI 3 PRO CHAT ==========
 with tab3:
@@ -755,4 +733,3 @@ with tab3:
         if st.button("🧹 Очистити чат", width='stretch', use_container_width=True):
             st.session_state['gemini_chat_history'] = []
             st.rerun()
-
