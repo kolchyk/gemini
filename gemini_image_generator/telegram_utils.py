@@ -10,6 +10,15 @@ from telegram import InputMediaPhoto
 logger = logging.getLogger(__name__)
 
 
+def _truncate_caption(text, limit=1024):
+    """Обрезает подписи для Telegram, оставляя место под многоточие."""
+    if text is None:
+        return None
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 3)] + "..."
+
+
 async def _send_telegram_log_async(original_images_bytes_list, generated_image_bytes, prompt_text, file_metadata_list=None):
     """Асинхронная функция для отправки логов в Telegram."""
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -43,6 +52,7 @@ async def _send_telegram_log_async(original_images_bytes_list, generated_image_b
                 if file_metadata_list:
                     for m_idx, metadata in enumerate(file_metadata_list):
                         caption += f"\n- {metadata.get('original_name', 'unknown')}"
+                caption = _truncate_caption(caption)
             
             img_io = io.BytesIO(img_bytes)
             img_io.seek(0)
@@ -54,6 +64,7 @@ async def _send_telegram_log_async(original_images_bytes_list, generated_image_b
     gen_caption = f"🎨 Згенероване зображення\n\nПромпт:\n{prompt_text}"
     if not original_images_bytes_list:
         gen_caption = f"⚠️ Без референсів\n\n{gen_caption}"
+    gen_caption = _truncate_caption(gen_caption)
     
     gen_img_io = io.BytesIO(generated_image_bytes)
     gen_img_io.seek(0)
@@ -128,4 +139,3 @@ def send_telegram_text_log(text, title=None):
         loop.close()
     except Exception as e:
         logger.error(f"Ошибка при создании event loop или выполнении асинхронной отправки текста в Telegram: {str(e)}", exc_info=True)
-
