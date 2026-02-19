@@ -3,6 +3,52 @@ import time
 from services.image_service import ImageService
 from config import settings, styles, prompts
 
+def render_image_sidebar():
+    """Renders the sidebar for image generator."""
+    with st.sidebar:
+        st.markdown(f'<div class="model-badge">🎨 {settings.IMAGE_MODEL}</div>', unsafe_allow_html=True)
+        
+        st.markdown('<div class="sidebar-section-label">Параметри</div>', unsafe_allow_html=True)
+        aspect_ratio = st.selectbox(
+            "Співвідношення:",
+            options=["1:1", "16:9", "9:16", "4:3", "3:4"],
+            index=["1:1", "16:9", "9:16", "4:3", "3:4"].index(st.session_state.get('image_aspect_ratio', "1:1")),
+            key="image_aspect_ratio_selector"
+        )
+        st.session_state['image_aspect_ratio'] = aspect_ratio
+        
+        resolution = st.selectbox(
+            "Роздільність:",
+            options=["1K", "2K", "4K"],
+            index=["1K", "2K", "4K"].index(st.session_state.get('image_resolution', "1K")),
+            key="image_resolution_selector"
+        )
+        st.session_state['image_resolution'] = resolution
+        
+        temperature = st.slider(
+            "Temperature:",
+            min_value=0.0,
+            max_value=1.0,
+            value=st.session_state.get('image_temperature', 1.0),
+            step=0.05,
+            key="image_temperature_slider"
+        )
+        st.session_state['image_temperature'] = temperature
+
+        st.divider()
+        if st.button("🧹 Очистити результат", use_container_width=True, type="secondary"):
+            st.session_state.pop('generated_image', None)
+            st.session_state.pop('generated_text', None)
+            st.rerun()
+
+        st.markdown('<div class="sidebar-section-label">Документація</div>', unsafe_allow_html=True)
+        st.markdown("""
+        - [Imagen 4 Guide](https://ai.google.dev/gemini-api/docs/imagen)
+        - [Prompt Engineering](https://ai.google.dev/gemini-api/docs/prompting-strategies)
+        
+        *Imagen 4 (Nano Banana) забезпечує високу якість та реалізм.*
+        """, unsafe_allow_html=True)
+
 def render_image_generator():
     """Renders the image generator UI component."""
     image_service = ImageService()
@@ -22,43 +68,6 @@ def render_image_generator():
         st.session_state['edited_prompt_men'] = None
     if 'edited_prompt_custom' not in st.session_state:
         st.session_state['edited_prompt_custom'] = None
-
-    # Sidebar Settings
-    with st.sidebar:
-        st.markdown(f'<div class="model-badge">🎨 {settings.IMAGE_MODEL}</div>', unsafe_allow_html=True)
-        
-        st.markdown('<div class="sidebar-section-label">Параметри</div>', unsafe_allow_html=True)
-        aspect_ratio = st.selectbox(
-            "Співвідношення:",
-            options=["1:1", "16:9", "9:16", "4:3", "3:4"],
-            index=["1:1", "16:9", "9:16", "4:3", "3:4"].index(st.session_state['image_aspect_ratio']),
-            key="image_aspect_ratio_selector"
-        )
-        st.session_state['image_aspect_ratio'] = aspect_ratio
-        
-        resolution = st.selectbox(
-            "Роздільність:",
-            options=["1K", "2K", "4K"],
-            index=["1K", "2K", "4K"].index(st.session_state['image_resolution']),
-            key="image_resolution_selector"
-        )
-        st.session_state['image_resolution'] = resolution
-        
-        temperature = st.slider(
-            "Temperature:",
-            min_value=0.0,
-            max_value=1.0,
-            value=st.session_state['image_temperature'],
-            step=0.05,
-            key="image_temperature_slider"
-        )
-        st.session_state['image_temperature'] = temperature
-
-        st.divider()
-        if st.button("🧹 Очистити результат", use_container_width=True, type="secondary"):
-            st.session_state.pop('generated_image', None)
-            st.session_state.pop('generated_text', None)
-            st.rerun()
 
     # Main Content Area
     # Section 1: Reference image upload (top)

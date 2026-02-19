@@ -1,4 +1,4 @@
-# Darnytsia Gemini Hub
+#   Gemini Hub
 
 Веб-додаток для генерації зображень за допомогою Google Gemini API.
 

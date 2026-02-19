@@ -210,7 +210,7 @@ from components.image_generator import render_image_generator
 from components.deep_research import render_deep_research
 from components.gemini_chat import render_gemini_chat
 
-st.set_page_config(page_title="Darnytsia Gemini Hub", layout="wide")
+st.set_page_config(page_title="  Gemini Hub", layout="wide")
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 tab1, tab2, tab3 = st.tabs(["🎨 Генератор Фото", "🔍 Дослідження", "💬 Chat Pro"])

@@ -1,7 +1,7 @@
 [project]
-name = "darnytsia-gemini-hub"
+name = " -gemini-hub"
 version = "0.1.0"
-description = "Веб-додаток Darnytsia Gemini Hub для генерації зображень за допомогою Google Gemini API для Darnytsia"
+description = "Веб-додаток   Gemini Hub для генерації зображень за допомогою Google Gemini API для  "
 requires-python = ">=3.14"
 dependencies = [
     "streamlit>=1.5.0",

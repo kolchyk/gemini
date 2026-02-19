@@ -2,6 +2,28 @@ import streamlit as st
 from services.research_service import research_service
 from config import settings
 
+def render_research_sidebar():
+    """Renders the sidebar for deep research."""
+    with st.sidebar:
+        st.markdown('<div class="model-badge">🔍 deep-research-pro-preview</div>', unsafe_allow_html=True)
+        
+        st.markdown('<div class="sidebar-section-label">Керування</div>', unsafe_allow_html=True)
+        
+        if st.button("⚠️ Скинути все дослідження", use_container_width=True, type="secondary"):
+            for key in [
+                "plan_id", "plan_text", "tasks", "research_id", 
+                "research_text", "synthesis_text", "infographic"
+            ]:
+                st.session_state[key] = [] if key == "tasks" else None
+            st.rerun()
+
+        st.markdown('<div class="sidebar-section-label">Документація</div>', unsafe_allow_html=True)
+        st.markdown("""
+        - [Deep Research Guide](https://ai.google.dev/gemini-api/docs/deep-research)
+        
+        *Deep Research Agent автономно планує та виконує дослідження.*
+        """, unsafe_allow_html=True)
+
 def render_deep_research():
     """Renders the Deep Research Agent UI component."""
     
@@ -18,29 +40,6 @@ def render_deep_research():
         if key not in st.session_state:
             st.session_state[key] = [] if key == "tasks" else None
 
-    # Sidebar Settings
-    with st.sidebar:
-        st.markdown('<div class="model-badge">🔍 deep-research-pro-preview</div>', unsafe_allow_html=True)
-        
-        st.markdown('<div class="sidebar-section-label">Керування</div>', unsafe_allow_html=True)
-        st.info(
-            """
-            **Етапи:**
-            1. **Plan** → Gemini розробляє план
-            2. **Research** → Пошук та аналіз
-            3. **Report** → Фінальний звіт
-            """
-        )
-        
-        if st.button("⚠️ Скинути все дослідження", use_container_width=True, type="secondary"):
-            for key in [
-                "plan_id", "plan_text", "tasks", "research_id", 
-                "research_text", "synthesis_text", "infographic"
-            ]:
-                st.session_state[key] = [] if key == "tasks" else None
-            st.rerun()
-
-    # Main Content Area
     st.subheader("🔍 Deep Research Agent")
 
     # Stepper UI
