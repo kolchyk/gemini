@@ -11,40 +11,83 @@ def render_gemini_chat():
     if 'gemini_chat_history' not in st.session_state:
         st.session_state['gemini_chat_history'] = []
     if 'chat_thinking_level' not in st.session_state:
-        st.session_state['chat_thinking_level'] = 'low'
+        st.session_state['chat_thinking_level'] = 'high'
     if 'chat_temperature' not in st.session_state:
-        st.session_state['chat_temperature'] = 0.7
+        st.session_state['chat_temperature'] = 0.95
     if 'chat_file_uploader_key' not in st.session_state:
         st.session_state['chat_file_uploader_key'] = 0
 
-    # Create two-column layout: main content (3) and settings panel (1)
-    col_main, col_settings = st.columns([3, 1])
+    # Sidebar Settings
+    with st.sidebar:
+        st.markdown('<div class="model-badge">💬 gemini-3.1-pro-preview</div>', unsafe_allow_html=True)
+        
+        st.markdown('<div class="sidebar-section-label">Налаштування</div>', unsafe_allow_html=True)
+        thinking_level = st.selectbox(
+            "Мислення:",
+            options=["low", "high"],
+            index=0 if st.session_state['chat_thinking_level'] == 'low' else 1,
+            key="thinking_level_selector"
+        )
+        st.session_state['chat_thinking_level'] = thinking_level
 
-    # Pre-read pending uploads from session state before widgets render,
-    # so they are available inside col_main when chat_input fires.
-    _chat_uploader_key = f"chat_file_uploader_{st.session_state['chat_file_uploader_key']}"
-    _pending_uploads = st.session_state.get(_chat_uploader_key) or []
+        temperature = st.slider(
+            "Temperature:",
+            min_value=0.0,
+            max_value=2.0,
+            value=st.session_state['chat_temperature'],
+            step=0.1,
+            key="chat_temperature_slider"
+        )
+        st.session_state['chat_temperature'] = temperature
 
-    with col_main:
-        st.subheader("💬 Чат з Gemini 3 Pro")
+        st.markdown('<div class="sidebar-section-label">Файли</div>', unsafe_allow_html=True)
+        _chat_uploader_key = f"chat_file_uploader_{st.session_state['chat_file_uploader_key']}"
+        st.file_uploader(
+            "Прикріпити до наступного повідомлення:",
+            accept_multiple_files=True,
+            key=_chat_uploader_key,
+            help="Підтримуються зображення, PDF, текст, код та інші файли",
+        )
+        _pending_uploads = st.session_state.get(_chat_uploader_key) or []
 
-        # Create scrollable container for chat messages
-        chat_messages_container = st.container()
-        with chat_messages_container:
-            st.markdown('<div class="chat-messages-scrollable">', unsafe_allow_html=True)
-            # Display chat history
-            for message in st.session_state['gemini_chat_history']:
-                with st.chat_message(message["role"]):
-                    for att in message.get("attachments", []):
-                        if att["mime_type"].startswith("image/") and att.get("bytes"):
-                            st.image(att["bytes"], caption=att["name"], width=150)
-                        else:
-                            st.caption(f"📎 {att['name']}")
-                    st.markdown(message["content"])
-            st.markdown('</div>', unsafe_allow_html=True)
+        st.divider()
+        msg_count = len(st.session_state['gemini_chat_history'])
+        st.caption(f"Повідомлень у чаті: {msg_count}")
+        
+        if st.button("🧹 Очистити чат", use_container_width=True, type="secondary"):
+            st.session_state['gemini_chat_history'] = []
+            st.rerun()
 
-        # Chat input (will be rendered at bottom by Streamlit, CSS will keep it fixed)
-        if prompt := st.chat_input("Введіть ваше повідомлення..."):
+    # Main Content Area
+    st.subheader("💬 Чат з Gemini 3 Pro")
+
+    # Display empty state if no history
+    if not st.session_state['gemini_chat_history']:
+        st.markdown("""
+            <div class="empty-state">
+                <div class="empty-state-icon">💬</div>
+                <h3>Почніть розмову з Gemini 3 Pro</h3>
+                <p>Ви можете ставити запитання, прикріплювати файли або просити допомоги з кодом.</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+    # Create scrollable container for chat messages
+    chat_messages_container = st.container()
+    with chat_messages_container:
+        st.markdown('<div class="chat-messages-scrollable">', unsafe_allow_html=True)
+        # Display chat history
+        for message in st.session_state['gemini_chat_history']:
+            with st.chat_message(message["role"]):
+                for att in message.get("attachments", []):
+                    if att["mime_type"].startswith("image/") and att.get("bytes"):
+                        st.image(att["bytes"], caption=att["name"], width=150)
+                    else:
+                        st.caption(f"📎 {att['name']}")
+                st.markdown(message["content"])
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Chat input
+    if prompt := st.chat_input("Введіть ваше повідомлення..."):
             # Upload any pending files to Gemini and collect attachment metadata
             attachments = []
             if _pending_uploads:
@@ -103,40 +146,4 @@ def render_gemini_chat():
                     error_message = f"❌ Помилка: {str(e)}"
                     message_placeholder.error(error_message)
                     st.exception(e)
-
-    # Right settings panel
-    with col_settings:
-        st.markdown('<div class="model-label">Модель:</div><div class="model-badge">💬 gemini-3.1-pro-preview</div>', unsafe_allow_html=True)
-        st.markdown("### Налаштування")
-
-        thinking_level = st.selectbox(
-            "Мислення:",
-            options=["low", "high"],
-            index=0 if st.session_state['chat_thinking_level'] == 'low' else 1,
-            key="thinking_level_selector"
-        )
-        st.session_state['chat_thinking_level'] = thinking_level
-
-        temperature = st.slider(
-            "Temperature:",
-            min_value=0.0,
-            max_value=2.0,
-            value=st.session_state['chat_temperature'],
-            step=0.1,
-            key="chat_temperature_slider"
-        )
-        st.session_state['chat_temperature'] = temperature
-
-        st.divider()
-        st.markdown("### Файли")
-        st.file_uploader(
-            "Прикріпити до наступного повідомлення:",
-            accept_multiple_files=True,
-            key=_chat_uploader_key,
-            help="Підтримуються зображення, PDF, текст, код та інші файли",
-        )
-
-        if st.button("🧹 Очистити чат", use_container_width=True):
-            st.session_state['gemini_chat_history'] = []
-            st.rerun()
 

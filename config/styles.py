@@ -2,13 +2,10 @@
 
 CUSTOM_CSS = """
     <style>
-        /* Google AI Studio inspired color scheme */
+        /* Google AI Studio inspired color scheme - Theme Aware */
         :root {
-            --ai-studio-bg: #fafafa;
-            --ai-studio-panel-bg: #ffffff;
-            --ai-studio-border: #e0e0e0;
-            --ai-studio-text: #202124;
-            --ai-studio-text-secondary: #5f6368;
+            --ai-studio-panel-bg: rgba(128, 128, 128, 0.05);
+            --ai-studio-border: rgba(128, 128, 128, 0.2);
             --ai-studio-primary: #1a73e8;
             --ai-studio-primary-hover: #1557b0;
         }
@@ -16,46 +13,32 @@ CUSTOM_CSS = """
         /* Settings panel styling */
         .settings-panel {
             padding: 1rem;
-            height: 100%;
-            position: sticky;
-            top: 0;
         }
         
-        .settings-panel h3 {
-            font-size: 0.875rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 1rem;
-            margin-top: 0;
+        /* Sidebar styling improvements */
+        [data-testid="stSidebar"] {
+            border-right: 1px solid var(--ai-studio-border);
         }
-        
-        .settings-panel .stSelectbox,
-        .settings-panel .stSlider,
-        .settings-panel .stButton {
-            margin-bottom: 1.5rem;
-        }
-        
+
         /* Card-like containers - respect theme */
-        .stContainer > div {
-            padding: 1.5rem;
-            border-radius: 8px;
+        div[data-testid="stVerticalBlock"] > div > div[data-testid="stVerticalBlock"] > .stElementContainer {
+            /* padding: 0.5rem 0; */
+        }
+        
+        /* Better containers */
+        .stContainer {
             border: 1px solid var(--ai-studio-border);
-            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
         }
         
         /* Button styling - Material Design inspired */
         .stButton > button {
-            width: 100%;
             border-radius: 4px;
             font-weight: 500;
             transition: all 0.2s ease;
-            padding: 0.625rem 1rem;
-            font-size: 0.875rem;
-        }
-        
-        .stButton > button:hover {
-            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            padding: 0.5rem 1rem;
         }
         
         /* Primary button - Google blue */
@@ -71,71 +54,8 @@ CUSTOM_CSS = """
         }
         
         /* Status indicators */
-        .status-pending {
-            color: #ff9800;
-            font-weight: 500;
-        }
-        
-        .status-processing {
-            color: var(--ai-studio-primary);
-            font-weight: 500;
-        }
-        
-        .status-completed {
-            color: #34a853;
-            font-weight: 500;
-        }
-        
-        .status-failed {
-            color: #ea4335;
-            font-weight: 500;
-        }
-        
-        /* Improve spacing */
-        .element-container {
-            margin-bottom: 1rem;
-        }
-        
-        /* Better text area - Material Design */
-        .stTextArea > div > div > textarea {
-            border-radius: 4px;
-            font-size: 0.875rem;
-        }
-        
-        .stTextArea > div > div > textarea:focus {
-            border-color: var(--ai-studio-primary);
-            box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
-            outline: none;
-        }
-        
-        /* Selectbox styling */
-        .stSelectbox > div > div > select {
-            border-radius: 4px;
-            font-size: 0.875rem;
-        }
-        
-        .stSelectbox > div > div > select:focus {
-            border-color: var(--ai-studio-primary);
-            box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
-        }
-        
-        /* Slider styling */
-        .stSlider > div > div {
-            color: var(--ai-studio-primary);
-        }
-        
-        /* File uploader styling */
-        .uploadedFile {
-            border-radius: 4px;
-            padding: 0.5rem;
-            margin: 0.5rem 0;
-            border: 1px solid var(--ai-studio-border);
-        }
-        
-        /* Progress bar styling */
-        .stProgress > div > div > div > div {
-            background-color: var(--ai-studio-primary);
-        }
+        .status-completed { color: #34a853; font-weight: 500; }
+        .status-failed { color: #ea4335; font-weight: 500; }
         
         /* Chat layout styling */
         .stChatMessage {
@@ -144,7 +64,7 @@ CUSTOM_CSS = """
         
         /* Create scrollable container for chat messages */
         .chat-messages-scrollable {
-            max-height: calc(100vh - 400px);
+            max-height: calc(100vh - 350px);
             overflow-y: auto;
             overflow-x: hidden;
             padding: 1rem 0;
@@ -152,78 +72,98 @@ CUSTOM_CSS = """
             scroll-behavior: smooth;
         }
         
-        /* Ensure chat input container stays at bottom - theme aware */
-        div[data-testid="stChatInputContainer"],
-        div[data-testid="stChatInputContainer"] > div {
-            position: sticky !important;
-            bottom: 0 !important;
-            z-index: 100 !important;
-            padding-top: 1rem !important;
-            border-top: 1px solid var(--ai-studio-border) !important;
-            margin-top: auto !important;
-        }
-        
-        /* Custom scrollbar for chat messages */
+        /* Custom scrollbar - Theme Aware */
         .chat-messages-scrollable::-webkit-scrollbar {
-            width: 8px;
+            width: 6px;
         }
         
         .chat-messages-scrollable::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 10px;
+            background: transparent;
         }
         
         .chat-messages-scrollable::-webkit-scrollbar-thumb {
-            background: #888;
+            background: rgba(128, 128, 128, 0.3);
             border-radius: 10px;
         }
         
         .chat-messages-scrollable::-webkit-scrollbar-thumb:hover {
-            background: #555;
+            background: rgba(128, 128, 128, 0.5);
+        }
+
+        /* Empty state styling */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            opacity: 0.6;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
         }
         
-        /* Main content area */
-        .main-content {
-            padding-right: 1rem;
-        }
-        
-        /* Divider styling */
-        hr {
-            border: none;
-            border-top: 1px solid var(--ai-studio-border);
-            margin: 1.5rem 0;
-        }
-        
-        /* Expander styling */
-        .streamlit-expanderHeader {
-            font-weight: 500;
-            color: var(--ai-studio-text);
-        }
         /* Model badge styling */
         .model-badge {
             background-color: var(--ai-studio-primary);
             color: white;
-            padding: 0.25rem 0.75rem;
-            border-radius: 12px;
-            font-size: 0.8rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
             font-weight: 600;
             display: inline-block;
             margin-bottom: 1rem;
-            box-shadow: 0 2px 4px rgba(26, 115, 232, 0.2);
         }
         
-        .model-container {
-            margin-bottom: 1.5rem;
-            padding: 0.5rem;
-            border-bottom: 1px solid var(--ai-studio-border);
-        }
-        
-        .model-label {
+        .sidebar-section-label {
             font-size: 0.75rem;
-            color: var(--ai-studio-text-secondary);
+            color: gray;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 0.25rem;
+            margin: 1.5rem 0 0.5rem 0;
+            font-weight: 600;
+        }
+
+        /* Stepper UI */
+        .stepper-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: var(--ai-studio-panel-bg);
+            border-radius: 8px;
+            border: 1px solid var(--ai-studio-border);
+        }
+
+        .step-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            position: relative;
+        }
+
+        .step-circle {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: var(--ai-studio-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            z-index: 2;
+        }
+
+        .step-circle.active {
+            background: var(--ai-studio-primary);
+            color: white;
+        }
+
+        .step-label {
+            font-size: 0.8rem;
+            text-align: center;
         }
     </style>
-"""
+""""""
