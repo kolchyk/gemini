@@ -31,11 +31,4 @@ with tab3:
     render_gemini_chat()
 
 if __name__ == "__main__":
-    try:
-        from streamlit.runtime.scriptrunner.script_run_context import get_script_run_ctx
-        in_streamlit = get_script_run_ctx() is not None
-    except Exception:
-        in_streamlit = False
-
-    if not in_streamlit:
-        subprocess.run(["streamlit", "run", sys.argv[0]])
+    st.info("Щоб запустити додаток, виконайте: `streamlit run app.py` у терміналі.")
