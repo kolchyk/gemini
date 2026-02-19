@@ -537,7 +537,7 @@ with tab2:
                     try:
                         client = get_gemini_client()
                         interaction = client.interactions.create(
-                            model="gemini-3-pro-preview",
+                            model="gemini-3.1-pro-preview",
                             input=(
                                 "Create executive report with Summary, Findings, "
                                 "Recommendations, Risks:\n\n"
@@ -670,7 +670,7 @@ with tab3:
                     
                     # Stream response
                     for chunk in client.models.generate_content_stream(
-                        model="gemini-3-pro-preview",
+                        model="gemini-3.1-pro-preview",
                         contents=contents,
                         config=generate_content_config,
                     ):
