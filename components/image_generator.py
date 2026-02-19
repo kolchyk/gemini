@@ -6,7 +6,16 @@ from config import settings, styles, prompts
 def render_image_sidebar():
     """Renders the sidebar for image generator."""
     with st.sidebar:
-        st.markdown(f'<div class="model-badge">🎨 {settings.IMAGE_MODEL}</div>', unsafe_allow_html=True)
+        current_model = st.session_state.get('image_model', settings.IMAGE_MODEL)
+        model_index = settings.IMAGE_MODELS.index(current_model) if current_model in settings.IMAGE_MODELS else 0
+        image_model = st.selectbox(
+            "Модель:",
+            options=settings.IMAGE_MODELS,
+            index=model_index,
+            key="image_model_selector"
+        )
+        st.session_state['image_model'] = image_model
+        st.markdown(f'<div class="model-badge">🎨 {image_model}</div>', unsafe_allow_html=True)
         
         st.markdown('<div class="sidebar-section-label">Параметри</div>', unsafe_allow_html=True)
         aspect_ratio = st.selectbox(
@@ -54,6 +63,8 @@ def render_image_generator():
     image_service = ImageService()
 
     # Initialize session state for image generator settings
+    if 'image_model' not in st.session_state:
+        st.session_state['image_model'] = settings.IMAGE_MODEL if settings.IMAGE_MODEL in settings.IMAGE_MODELS else settings.IMAGE_MODELS[0]
     if 'image_aspect_ratio' not in st.session_state:
         st.session_state['image_aspect_ratio'] = "1:1"
     if 'image_resolution' not in st.session_state:
@@ -182,7 +193,8 @@ def render_image_generator():
                         aspect_ratio=st.session_state['image_aspect_ratio'],
                         person_images=uploaded_files,
                         resolution=st.session_state['image_resolution'],
-                        temperature=st.session_state['image_temperature']
+                        temperature=st.session_state['image_temperature'],
+                        model=st.session_state['image_model']
                     )
                     
                     if result['image_bytes']:

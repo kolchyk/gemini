@@ -14,7 +14,7 @@ class ImageService:
         """Initializes the ImageService with a Gemini client."""
         self.client = get_gemini_client()
 
-    def generate_image(self, prompt, aspect_ratio="1:1", person_images=None, resolution="1K", temperature=1.0):
+    def generate_image(self, prompt, aspect_ratio="1:1", person_images=None, resolution="1K", temperature=1.0, model=None):
         """
         Generates an image based on a prompt and optional reference images.
         
@@ -24,6 +24,7 @@ class ImageService:
             person_images (list, optional): List of file-like objects (e.g., from Streamlit file_uploader).
             resolution (str, optional): The resolution of the generated image (e.g., "1K", "2K", "4K").
             temperature (float, optional): The creativity temperature (0.0 to 1.0).
+            model (str, optional): Model name (e.g. "gemini-3-pro-image-preview", "imagen-4.0-generate-001").
             
         Returns:
             dict: A dictionary containing 'image_bytes' (bytes or None) and 'text_output' (str).
@@ -97,7 +98,7 @@ class ImageService:
 
         image_bytes = None
         text_output = []
-        model_name = settings.IMAGE_MODEL
+        model_name = model or settings.IMAGE_MODEL
 
         # Process the generation stream
         for chunk in self.client.models.generate_content_stream(
