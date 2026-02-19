@@ -2,6 +2,7 @@ import streamlit as st
 import mimetypes
 import os
 from services.chat_service import chat_service
+from services.error_utils import format_error_with_retry, format_api_error
 from config import settings
 
 def render_chat_sidebar():
@@ -109,7 +110,7 @@ def render_gemini_chat():
                         att = chat_service.upload_file(uploaded_file)
                         attachments.append(att)
             except Exception as e:
-                st.error(f"❌ Помилка завантаження файлу: {str(e)}")
+                st.error(format_api_error(e))
 
         # Build history entry and append
         user_msg = {"role": "user", "content": prompt}
@@ -155,7 +156,7 @@ def render_gemini_chat():
                 chat_service.log_chat(prompt, full_response)
 
             except Exception as e:
-                error_message = f"❌ Помилка: {str(e)}"
-                message_placeholder.error(error_message)
-                st.exception(e)
+                message_placeholder.error(format_error_with_retry(e, "генерацію відповіді"))
+                with st.expander("Технічні деталі"):
+                    st.exception(e)
 

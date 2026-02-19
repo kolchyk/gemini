@@ -8,8 +8,8 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "6780240224")
 
 DEFAULT_MODEL = "gemini-3.1-pro-preview"
-IMAGE_MODEL = os.getenv("IMAGE_MODEL", "gemini-3-pro-image-preview")
-IMAGE_MODELS = [
-    "gemini-3-pro-image-preview",
-    "imagen-4.0-generate-001",
-]
+ 
+# Imagen models use generate_images() API; Gemini uses generate_content_stream()
+IMAGEN_MODELS = ("imagen-4.0-generate-001",  "gemini-3-pro-image-preview", "imagen-4.0-ultra-generate-001")
+IMAGE_MODELS = IMAGEN_MODELS
+IMAGE_MODEL = "gemini-3-pro-image-preview"

@@ -1,5 +1,6 @@
 import streamlit as st
 from services.research_service import research_service
+from services.error_utils import format_error_with_retry
 from config import settings
 
 def render_research_sidebar():
@@ -86,7 +87,7 @@ def render_deep_research():
                         st.session_state['tasks'] = tasks
                         st.rerun()
                     except Exception as e:
-                        st.error(str(e))
+                        st.error(format_error_with_retry(e, "планування дослідження"))
 
     # Step 2: Task Selection & Research Execution
     if st.session_state['plan_text']:
@@ -117,7 +118,7 @@ def render_deep_research():
                             st.session_state['research_text'] = research_text
                             st.rerun()
                         except Exception as e:
-                            st.error(str(e))
+                            st.error(format_error_with_retry(e, "дослідження"))
 
     # Step 3: Synthesis & Reporting
     if st.session_state['research_text']:
@@ -133,7 +134,7 @@ def render_deep_research():
                             )
                             st.session_state['synthesis_text'] = synthesis
                         except Exception as e:
-                            st.error(str(e))
+                            st.error(format_error_with_retry(e, "створення звіту"))
             
             with col_b:
                 if st.button("🖼️ Згенерувати інфографіку (TL;DR)", use_container_width=True):

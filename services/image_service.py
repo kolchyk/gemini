@@ -36,6 +36,18 @@ class ImageService:
         if not prompt or not prompt.strip():
             raise ValueError("Prompt is required for image generation.")
 
+        model_name = model or settings.IMAGE_MODEL
+        is_imagen = model_name in getattr(settings, "IMAGEN_MODELS", ())
+
+        if is_imagen:
+            return self._generate_with_imagen(
+                prompt=prompt,
+                aspect_ratio=aspect_ratio,
+                resolution=resolution,
+                model_name=model_name,
+                person_images=person_images,
+            )
+
         file_parts = []
         saved_file_metadata = []
         original_images_bytes = []
@@ -136,3 +148,48 @@ class ImageService:
             'image_bytes': image_bytes,
             'text_output': "".join(text_output)
         }
+
+    def _generate_with_imagen(self, prompt, aspect_ratio, resolution, model_name, person_images=None):
+        """
+        Generates an image using Imagen's generate_images() API.
+        Imagen does not support generateContent; it requires the dedicated generate_images endpoint.
+        Reference images are not supported by Imagen generate_images (text-to-image only).
+        """
+        config = types.GenerateImagesConfig(
+            number_of_images=1,
+            aspect_ratio=aspect_ratio,
+            image_size=resolution,
+        )
+        response = self.client.models.generate_images(
+            model=model_name,
+            prompt=prompt,
+            config=config,
+        )
+        image_bytes = None
+        if response.generated_images and len(response.generated_images) > 0:
+            img = response.generated_images[0]
+            if img.image and hasattr(img.image, "image_bytes"):
+                data = img.image.image_bytes
+                if data:
+                    image_bytes = base64.b64decode(data) if isinstance(data, str) else data
+
+        original_images_bytes = []
+        saved_file_metadata = []
+        if person_images:
+            for f in person_images:
+                try:
+                    f.seek(0)
+                    original_images_bytes.append(f.read())
+                except Exception:
+                    pass
+        if image_bytes:
+            try:
+                telegram_service.sync_send_image_log(
+                    original_images_bytes_list=original_images_bytes,
+                    generated_image_bytes=image_bytes,
+                    prompt_text=prompt,
+                    file_metadata_list=saved_file_metadata or None,
+                )
+            except Exception:
+                pass
+        return {"image_bytes": image_bytes, "text_output": ""}

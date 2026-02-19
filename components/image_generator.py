@@ -1,6 +1,7 @@
 import streamlit as st
 import time
 from services.image_service import ImageService
+from services.error_utils import format_error_with_retry
 from config import settings, styles, prompts
 
 def render_image_sidebar():
@@ -91,6 +92,12 @@ def render_image_generator():
         key="reference_images"
     )
     
+    # Imagen models use text-to-image only; reference images are ignored
+    current_image_model = st.session_state.get('image_model', settings.IMAGE_MODEL)
+    is_imagen = current_image_model in getattr(settings, 'IMAGEN_MODELS', ())
+    if uploaded_files and is_imagen:
+        st.info("ℹ️ Модель Imagen генерує зображення лише за текстовим описом. Референсні зображення ігноруються.")
+
     # Display uploaded reference images immediately (as thumbnails)
     if uploaded_files:
         num_files = len(uploaded_files)
@@ -206,8 +213,9 @@ def render_image_generator():
                     else:
                         st.warning("Модель не повернула зображення. Спробуйте інший промпт.")
                 except Exception as e:
-                    st.error(f"❌ Виникла помилка: {str(e)}")
-                    st.exception(e)
+                    st.error(format_error_with_retry(e, "генерацію зображення"))
+                    with st.expander("Технічні деталі"):
+                        st.exception(e)
 
     # Section 3: Result display (bottom)
     if 'generated_image' in st.session_state:
