@@ -61,28 +61,17 @@ def render_image_sidebar():
         )
         st.session_state['image_temperature'] = temperature
 
-        st.markdown('<div class="sidebar-section-label">Розширені</div>', unsafe_allow_html=True)
-
-        thinking_level = st.selectbox(
-            "Thinking:",
-            options=["MINIMAL", "LOW", "MEDIUM", "HIGH"],
-            index=["MINIMAL", "LOW", "MEDIUM", "HIGH"].index(
-                st.session_state.get('image_thinking_level', settings.IMAGE_DEFAULT_THINKING_LEVEL)
-            ),
-            key="image_thinking_level_selector"
-        )
-        st.session_state['image_thinking_level'] = thinking_level
-
-        person_generation = st.selectbox(
-            "Person Generation:",
-            options=["ALLOW_ALL", "DONT_ALLOW", "ALLOW_ADULT"],
-            index=["ALLOW_ALL", "DONT_ALLOW", "ALLOW_ADULT"].index(
-                st.session_state.get('image_person_generation', settings.IMAGE_DEFAULT_PERSON_GENERATION)
-            ),
-            key="image_person_generation_selector",
-            help="Наразі підтримується лише для моделей Imagen (якщо доступно). Моделі Gemini використовують власну політику безпеки."
-        )
-        st.session_state['image_person_generation'] = person_generation
+        if image_generation_mode in ("Pro", "Обидві"):
+            st.markdown('<div class="sidebar-section-label">Розширені</div>', unsafe_allow_html=True)
+            thinking_level = st.selectbox(
+                "Thinking:",
+                options=["MINIMAL", "LOW", "MEDIUM", "HIGH"],
+                index=["MINIMAL", "LOW", "MEDIUM", "HIGH"].index(
+                    st.session_state.get('image_thinking_level', settings.IMAGE_DEFAULT_THINKING_LEVEL)
+                ),
+                key="image_thinking_level_selector"
+            )
+            st.session_state['image_thinking_level'] = thinking_level
 
         st.divider()
         if st.button("🧹 Очистити результат", use_container_width=True, type="secondary"):
@@ -247,9 +236,9 @@ def _render_generate_button(image_service, prompt, uploaded_files):
                     resolution = st.session_state.get('image_resolution', settings.IMAGE_DEFAULT_RESOLUTION)
                     temperature = st.session_state.get('image_temperature', settings.IMAGE_DEFAULT_TEMPERATURE)
                     thinking_level = st.session_state.get('image_thinking_level', settings.IMAGE_DEFAULT_THINKING_LEVEL)
-                    person_generation = st.session_state.get('image_person_generation', settings.IMAGE_DEFAULT_PERSON_GENERATION)
 
                     def generate_with_model(model_name):
+                        model_thinking = None if "pro" not in model_name.lower() else thinking_level
                         return model_name, image_service.generate_image(
                             prompt=prompt,
                             aspect_ratio=aspect_ratio,
@@ -257,8 +246,7 @@ def _render_generate_button(image_service, prompt, uploaded_files):
                             resolution=resolution,
                             temperature=temperature,
                             model=model_name,
-                            thinking_level=thinking_level,
-                            person_generation=person_generation,
+                            thinking_level=model_thinking,
                         )
 
                     results = {}

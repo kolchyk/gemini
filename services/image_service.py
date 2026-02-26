@@ -99,11 +99,10 @@ class ImageService:
         parts_list = file_parts + [types.Part.from_text(text=prompt)]
         contents = [types.Content(role="user", parts=parts_list)]
 
-        # Determine thinking config based on model generation
+        # Only Pro models support ThinkingConfig; Flash models raise INVALID_ARGUMENT
         thinking_config = None
-        if "gemini-3" in model_name:
-            # Gemini 3 models (Pro Image, Flash Image) use thinking_level
-            # Note: "MINIMAL" might require thought_signature for multi-turn
+        is_pro_model = "pro" in model_name.lower()
+        if is_pro_model and thinking_level:
             thinking_config = types.ThinkingConfig(thinking_level=thinking_level)
 
         # Config following Google reference code pattern
