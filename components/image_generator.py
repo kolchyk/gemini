@@ -79,7 +79,8 @@ def render_image_sidebar():
             index=["ALLOW_ALL", "DONT_ALLOW", "ALLOW_ADULT"].index(
                 st.session_state.get('image_person_generation', settings.IMAGE_DEFAULT_PERSON_GENERATION)
             ),
-            key="image_person_generation_selector"
+            key="image_person_generation_selector",
+            help="Наразі підтримується лише для моделей Imagen (якщо доступно). Моделі Gemini використовують власну політику безпеки."
         )
         st.session_state['image_person_generation'] = person_generation
 

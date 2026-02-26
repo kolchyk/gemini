@@ -13,13 +13,18 @@ class TestImageService(unittest.TestCase):
         
         # Mock generate_content_stream response (it's a generator)
         mock_chunk = MagicMock()
-        mock_chunk.candidates = [MagicMock()]
-        mock_chunk.candidates[0].content.parts = [MagicMock()]
+        mock_part_image = MagicMock()
+        mock_part_text = MagicMock()
+        mock_chunk.parts = [mock_part_image, mock_part_text]
         
-        # Use a real base64-encoded string for test stability
+        # Setup image part
         mock_image_data_b64 = base64.b64encode(b"mock_image_bytes").decode('utf-8')
-        mock_chunk.candidates[0].content.parts[0].inline_data.data = mock_image_data_b64
-        mock_chunk.text = "Mock response text"
+        mock_part_image.inline_data.data = mock_image_data_b64
+        mock_part_image.text = None
+        
+        # Setup text part
+        mock_part_text.inline_data = None
+        mock_part_text.text = "Mock response text"
         
         mock_client.models.generate_content_stream.return_value = [mock_chunk]
         

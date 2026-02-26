@@ -65,6 +65,7 @@ class ImageService:
                 resolution=resolution,
                 model_name=model_name,
                 person_images=person_images,
+                person_generation=person_generation,
             )
 
         file_parts = []
@@ -111,7 +112,6 @@ class ImageService:
             image_config=types.ImageConfig(
                 aspect_ratio=aspect_ratio,
                 image_size=resolution,
-                person_generation=person_generation,
             ),
             response_modalities=["TEXT", "IMAGE"],
             temperature=temperature,
@@ -155,12 +155,13 @@ class ImageService:
             'text_output': "".join(text_output)
         }
 
-    def _generate_with_imagen(self, prompt, aspect_ratio, resolution, model_name, person_images=None):
+    def _generate_with_imagen(self, prompt, aspect_ratio, resolution, model_name, person_images=None, person_generation=None):
         """Generates an image using Imagen's generate_images() API (text-to-image only)."""
         config = types.GenerateImagesConfig(
             number_of_images=1,
             aspect_ratio=aspect_ratio,
             image_size=resolution,
+            person_generation=person_generation.lower() if person_generation else None,
         )
         response = self.client.models.generate_images(
             model=model_name,
