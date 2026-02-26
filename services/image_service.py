@@ -88,17 +88,26 @@ class ImageService:
         parts_list = file_parts + [types.Part.from_text(text=prompt)]
         contents = [types.Content(role="user", parts=parts_list)]
 
+        # Determine thinking config based on model generation
+        thinking_config = None
+        if "gemini-3" in model_name:
+            # Gemini 3 models (Pro Image, Flash Image) use thinking_level
+            # Note: "MINIMAL" might require thought_signature for multi-turn
+            thinking_config = types.ThinkingConfig(thinking_level=thinking_level)
+        elif "gemini-2.5" in model_name:
+            # Gemini 2.5 models use thinking_budget
+            budget_map = {"MINIMAL": 0, "LOW": 4096, "MEDIUM": 8192, "HIGH": 16384}
+            thinking_config = types.ThinkingConfig(thinking_budget=budget_map.get(thinking_level, 8192))
+
         # Config following Google reference code pattern
         generate_content_config = types.GenerateContentConfig(
-            thinking_config=types.ThinkingConfig(
-                thinking_level=thinking_level,
-            ),
+            thinking_config=thinking_config,
             image_config=types.ImageConfig(
                 aspect_ratio=aspect_ratio,
                 image_size=resolution,
                 person_generation=person_generation,
             ),
-            response_modalities=["IMAGE", "TEXT"],
+            response_modalities=["TEXT", "IMAGE"],
             temperature=temperature,
         )
 
@@ -111,17 +120,18 @@ class ImageService:
             contents=contents,
             config=generate_content_config,
         ):
-            if chunk.parts is None:
+            if not chunk.parts:
                 continue
-            if chunk.parts[0].inline_data and chunk.parts[0].inline_data.data:
-                inline_data = chunk.parts[0].inline_data
-                data = inline_data.data
-                if isinstance(data, str):
-                    data = base64.b64decode(data)
-                image_bytes = data
-            else:
-                if hasattr(chunk, 'text') and chunk.text:
-                    text_output.append(chunk.text)
+            
+            for part in chunk.parts:
+                if part.inline_data and part.inline_data.data:
+                    data = part.inline_data.data
+                    if isinstance(data, str):
+                        data = base64.b64decode(data)
+                    # For thinking models, the last image in the stream is usually the final one
+                    image_bytes = data
+                elif part.text:
+                    text_output.append(part.text)
 
         if image_bytes:
             try:
