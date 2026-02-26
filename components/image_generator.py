@@ -5,16 +5,26 @@ from services.image_service import ImageService
 from services.error_utils import format_error_with_retry
 from config import settings, prompts
 
+MODEL_DISPLAY_NAMES = {
+    settings.GEMINI_IMAGE_MODELS[0]: "⚡ Flash",
+    settings.GEMINI_IMAGE_MODELS[1]: "✨ Pro",
+}
+
+_MODE_HINTS = {
+    "Flash": "⚡ Швидко (~10с). Підходить для ескізів та ітерацій.",
+    "Pro": "✨ Вища якість (~30с). Підходить для фінальних зображень.",
+    "Обидві": "🔀 Паралельна генерація — порівняйте результати двох моделей.",
+}
 
 
 def _render_controls_row():
-    """Renders generation mode, aspect ratio, and temperature controls inline."""
+    """Renders model, aspect ratio, and creativity controls inline."""
     mode = st.session_state.get('image_generation_mode', 'Pro')
     col_mode, col_ratio, col_temp = st.columns([1, 1, 2])
 
     with col_mode:
         image_generation_mode = st.selectbox(
-            "Режим генерації",
+            "Модель",
             options=["Flash", "Pro", "Обидві"],
             index=["Flash", "Pro", "Обидві"].index(mode),
             key="image_generation_mode_selector"
@@ -24,6 +34,7 @@ def _render_controls_row():
             st.session_state['image_model'] = settings.GEMINI_IMAGE_MODELS[0]
         elif image_generation_mode == "Pro":
             st.session_state['image_model'] = settings.GEMINI_IMAGE_MODELS[1]
+        st.caption(_MODE_HINTS[image_generation_mode])
 
     with col_ratio:
         aspect_ratio = st.selectbox(
@@ -38,14 +49,16 @@ def _render_controls_row():
 
     with col_temp:
         temperature = st.slider(
-            "Temperature",
+            "Творчість",
             min_value=0.0,
             max_value=1.0,
             value=st.session_state.get('image_temperature', settings.IMAGE_DEFAULT_TEMPERATURE),
             step=0.05,
+            help="Чим вище значення — тим більш несподіваний та творчий результат",
             key="image_temperature_slider"
         )
         st.session_state['image_temperature'] = temperature
+        st.caption(f"Стабільно ◀──── {temperature:.2f} ────▶ Творчо")
 
     st.session_state['image_resolution'] = "2K"
     st.session_state['image_thinking_level'] = "HIGH"
@@ -75,91 +88,83 @@ def _init_session_state():
 
 def _render_reference_upload():
     """Step 1: Reference image upload section. Returns uploaded files."""
-    st.subheader("📤 Крок 1: Референсні зображення")
-    uploaded_files = st.file_uploader(
-        "Референсні зображення (опціонально)",
-        type=['jpg', 'jpeg', 'png', 'bmp', 'gif'],
-        accept_multiple_files=True,
-        help="Для режиму 'З нуля' — опціонально. Для 'Жінки'/'Чоловіки' — рекомендовано 1–3 референси.",
-        key="reference_images"
-    )
+    with st.container(border=True):
+        st.subheader("📤 Крок 1: Референсні зображення")
+        uploaded_files = st.file_uploader(
+            "Референсні зображення (опціонально)",
+            type=['jpg', 'jpeg', 'png', 'bmp', 'gif'],
+            accept_multiple_files=True,
+            help="Для режиму 'З нуля' — опціонально. Для 'Жінки'/'Чоловіки' — рекомендовано 1–3 референси.",
+            key="reference_images"
+        )
 
-    current_image_model = st.session_state.get('image_model', settings.IMAGE_MODEL)
-    # Gemini models and Nano Banana 2 use native Gemini API (generate_content)
-    is_imagen = "imagen" in current_image_model.lower() or current_image_model in getattr(settings, 'IMAGEN_MODELS', ())
-    is_gemini_image = "gemini" in current_image_model.lower() or current_image_model in getattr(settings, 'GEMINI_IMAGE_MODELS', ())
-    
-    if is_gemini_image:
-        is_imagen = False
-        
-    if uploaded_files and is_imagen:
-        st.info("ℹ️ Модель Imagen генерує зображення лише за текстовим описом. Референсні зображення ігноруються.")
-
-    if uploaded_files:
-        num_files = len(uploaded_files)
-        cols = st.columns(min(6, num_files))
-        for idx, uploaded_file in enumerate(uploaded_files):
-            with cols[idx % len(cols)]:
-                st.image(uploaded_file, caption=f"Реф. {idx + 1}", width='stretch')
+        if uploaded_files:
+            num_files = len(uploaded_files)
+            cols = st.columns(min(6, num_files))
+            for idx, uploaded_file in enumerate(uploaded_files):
+                with cols[idx % len(cols)]:
+                    st.image(uploaded_file, caption=f"Реф. {idx + 1}", width='stretch')
 
     return uploaded_files
 
 
 def _render_prompt_section():
     """Step 2: Prompt type selector and text area. Returns the prompt text."""
-    st.subheader("✍️ Крок 2: Промпт")
+    with st.container(border=True):
+        st.subheader("✍️ Крок 2: Промпт")
 
-    prompt_type_options = ["З нуля (Власний промпт)", "Жінки", "Чоловіки"]
-    prompt_type_index_map = {'custom': 0, 'women': 1, 'men': 2}
-    current_index = prompt_type_index_map.get(st.session_state['prompt_type'], 0)
+        prompt_type_options = ["З нуля (Власний промпт)", "Жінки", "Чоловіки"]
+        prompt_type_index_map = {'custom': 0, 'women': 1, 'men': 2}
+        current_index = prompt_type_index_map.get(st.session_state['prompt_type'], 0)
 
-    prompt_type = st.radio(
-        "Режим генерації:",
-        prompt_type_options,
-        index=current_index,
-        horizontal=True,
-        help="Оберіть режим генерації. 'З нуля' — для створення зображень з нуля, 'Жінки'/'Чоловіки' — для редагування фото.",
-        key="prompt_type_selector"
-    )
+        prompt_type = st.radio(
+            "Тип промпту:",
+            prompt_type_options,
+            index=current_index,
+            horizontal=True,
+            help="'З нуля' — для створення зображень з нуля, 'Жінки'/'Чоловіки' — для редагування фото з референсами.",
+            key="prompt_type_selector"
+        )
 
-    type_map = {
-        "З нуля (Власний промпт)": 'custom',
-        "Жінки": 'women',
-        "Чоловіки": 'men'
-    }
-    current_prompt_type = type_map[prompt_type]
+        type_map = {
+            "З нуля (Власний промпт)": 'custom',
+            "Жінки": 'women',
+            "Чоловіки": 'men'
+        }
+        current_prompt_type = type_map[prompt_type]
 
-    if current_prompt_type != st.session_state['prompt_type']:
-        old_prompt_key = f"prompt_text_area_{st.session_state['prompt_type']}"
-        if old_prompt_key in st.session_state:
-            st.session_state[f'edited_prompt_{st.session_state["prompt_type"]}'] = st.session_state[old_prompt_key]
-        st.session_state['prompt_type'] = current_prompt_type
+        if current_prompt_type != st.session_state['prompt_type']:
+            old_prompt_key = f"prompt_text_area_{st.session_state['prompt_type']}"
+            if old_prompt_key in st.session_state:
+                st.session_state[f'edited_prompt_{st.session_state["prompt_type"]}'] = st.session_state[old_prompt_key]
+            st.session_state['prompt_type'] = current_prompt_type
 
-    # Determine prompt
-    prompt_map = {
-        'women': (prompts.PROMPT_WOMEN, st.session_state['edited_prompt_women']),
-        'men': (prompts.PROMPT_MEN, st.session_state['edited_prompt_men']),
-        'custom': (prompts.PROMPT_CUSTOM, st.session_state['edited_prompt_custom']),
-    }
-    base_prompt, edited_prompt = prompt_map[st.session_state['prompt_type']]
-    current_prompt_value = edited_prompt if edited_prompt is not None else base_prompt
+        # Determine prompt
+        prompt_map = {
+            'women': (prompts.PROMPT_WOMEN, st.session_state['edited_prompt_women']),
+            'men': (prompts.PROMPT_MEN, st.session_state['edited_prompt_men']),
+            'custom': (prompts.PROMPT_CUSTOM, st.session_state['edited_prompt_custom']),
+        }
+        base_prompt, edited_prompt = prompt_map[st.session_state['prompt_type']]
+        current_prompt_value = edited_prompt if edited_prompt is not None else base_prompt
 
-    prompt_key = f"prompt_text_area_{st.session_state['prompt_type']}"
-    prompt = st.text_area(
-        "Промпт:",
-        value=current_prompt_value,
-        height=150,
-        placeholder="Опишіть що згенерувати...",
-        key=prompt_key
-    )
+        prompt_key = f"prompt_text_area_{st.session_state['prompt_type']}"
+        prompt = st.text_area(
+            "Промпт:",
+            value=current_prompt_value,
+            height=150,
+            placeholder="Опишіть що згенерувати...",
+            key=prompt_key
+        )
 
-    col_reset, _ = st.columns([1, 2])
-    with col_reset:
-        if st.button("↩️ Скинути промпт", use_container_width=True):
-            st.session_state[f'edited_prompt_{st.session_state["prompt_type"]}'] = base_prompt
-            st.rerun()
+        col_reset, _ = st.columns([1, 2])
+        with col_reset:
+            if st.button("↩️ Скинути промпт", use_container_width=True):
+                st.session_state[f'edited_prompt_{st.session_state["prompt_type"]}'] = base_prompt
+                st.rerun()
 
-    st.session_state[f'edited_prompt_{st.session_state["prompt_type"]}'] = prompt
+        st.session_state[f'edited_prompt_{st.session_state["prompt_type"]}'] = prompt
+
     return prompt
 
 
@@ -172,14 +177,18 @@ def _render_generate_button(image_service, prompt, uploaded_files):
     if mode == "Обидві":
         button_label += " (паралельно)"
 
-    col_gen, col_clear = st.columns([4, 1])
+    has_results = bool(st.session_state.get('generated_results'))
 
-    with col_clear:
-        if st.button("🧹 Очистити", use_container_width=True, type="secondary"):
-            st.session_state.pop('generated_image', None)
-            st.session_state.pop('generated_text', None)
-            st.session_state.pop('generated_results', None)
-            st.rerun()
+    if has_results:
+        col_gen, col_clear = st.columns([4, 1])
+        with col_clear:
+            if st.button("🧹 Очистити", use_container_width=True, type="secondary"):
+                st.session_state.pop('generated_image', None)
+                st.session_state.pop('generated_text', None)
+                st.session_state.pop('generated_results', None)
+                st.rerun()
+    else:
+        col_gen = st.columns(1)[0]
 
     with col_gen:
         if st.button(button_label, type="primary", use_container_width=True):
@@ -247,23 +256,24 @@ def _render_generate_button(image_service, prompt, uploaded_files):
 def _render_result_section():
     """Step 3: Result display with side-by-side models."""
     results = st.session_state.get('generated_results', {})
-    
+
     if results:
-        st.subheader("🖼️ Результати")
-        
+        st.subheader("🖼️ Крок 3: Результат")
+
         model_names = list(results.keys())
         num_models = len(model_names)
-        
+
         if num_models > 0:
             cols = st.columns(num_models)
             for idx, model_name in enumerate(model_names):
                 with cols[idx]:
                     result = results[model_name]
-                    st.markdown(f"**Модель: `{model_name}`**")
+                    display_name = MODEL_DISPLAY_NAMES.get(model_name, model_name)
+                    st.markdown(f"**{display_name}**")
                     if result.get('image_bytes'):
                         st.image(result['image_bytes'], width='stretch')
                         st.download_button(
-                            label=f"📥 Завантажити ({model_name})",
+                            label=f"📥 Завантажити ({display_name})",
                             data=result['image_bytes'],
                             file_name=f"generated_{model_name}_{int(time.time())}.png",
                             mime="image/png",
@@ -271,13 +281,13 @@ def _render_result_section():
                             key=f"download_{model_name}_{idx}"
                         )
                         if result.get('text_output'):
-                            with st.expander(f"Опис від {model_name}"):
+                            with st.expander(f"Опис від {display_name}"):
                                 st.write(result['text_output'])
                     else:
-                        st.warning(f"Модель `{model_name}` не повернула зображення.")
+                        st.warning(f"{display_name} не повернула зображення.")
     elif 'generated_image' in st.session_state:
         # Fallback for old sessions or single results
-        st.subheader("🖼️ Результат")
+        st.subheader("🖼️ Крок 3: Результат")
         st.image(st.session_state['generated_image'], width='stretch')
         st.download_button(
             label="📥 Завантажити зображення",

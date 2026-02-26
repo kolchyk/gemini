@@ -44,26 +44,7 @@ class ImageService:
             raise ValueError("Prompt is required for image generation.")
 
         model_name = model or settings.IMAGE_MODEL
-        
-        # Determine if we should use Imagen API (generate_images) or Gemini API (generate_content)
-        # Gemini 2.x/3.x image models and Nano Banana use generate_content with response_modalities=['IMAGE']
-        is_imagen = "imagen" in model_name.lower() or model_name in getattr(settings, "IMAGEN_MODELS", ())
-        is_gemini_image = "gemini" in model_name.lower() or model_name in getattr(settings, "GEMINI_IMAGE_MODELS", ())
-        
-        # If it's a Gemini model, it's definitely NOT an Imagen model
-        if is_gemini_image:
-            is_imagen = False
-            
-        logger.debug(f"Generating image with model: {model_name}, is_imagen: {is_imagen}")
-
-        if is_imagen:
-            return self._generate_with_imagen(
-                prompt=prompt,
-                aspect_ratio=aspect_ratio,
-                resolution=resolution,
-                model_name=model_name,
-                person_images=person_images,
-            )
+        logger.debug(f"Generating image with model: {model_name}")
 
         file_parts = []
         saved_file_metadata = []
@@ -163,44 +144,3 @@ class ImageService:
             'text_output': "".join(text_output)
         }
 
-    def _generate_with_imagen(self, prompt, aspect_ratio, resolution, model_name, person_images=None):
-        """Generates an image using Imagen's generate_images() API (text-to-image only)."""
-        config = types.GenerateImagesConfig(
-            number_of_images=1,
-            aspect_ratio=aspect_ratio,
-            image_size=resolution,
-        )
-        response = self.client.models.generate_images(
-            model=model_name,
-            prompt=prompt,
-            config=config,
-        )
-        image_bytes = None
-        if response.generated_images and len(response.generated_images) > 0:
-            img = response.generated_images[0]
-            if img.image and hasattr(img.image, "image_bytes"):
-                data = img.image.image_bytes
-                if data:
-                    image_bytes = base64.b64decode(data) if isinstance(data, str) else data
-
-        original_images_bytes = []
-        if person_images:
-            for f in person_images:
-                try:
-                    f.seek(0)
-                    original_images_bytes.append(f.read())
-                except Exception as e:
-                    logger.debug(f"Failed to read reference image: {e}")
-
-        if image_bytes:
-            try:
-                telegram_service.sync_send_image_log(
-                    original_images_bytes_list=original_images_bytes,
-                    generated_image_bytes=image_bytes,
-                    prompt_text=prompt,
-                    file_metadata_list=None,
-                )
-            except Exception as e:
-                logger.debug(f"Telegram logging failed: {e}")
-
-        return {"image_bytes": image_bytes, "text_output": ""}
