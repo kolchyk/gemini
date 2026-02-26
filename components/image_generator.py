@@ -100,7 +100,7 @@ def _render_reference_upload():
         cols = st.columns(min(6, num_files))
         for idx, uploaded_file in enumerate(uploaded_files):
             with cols[idx % len(cols)]:
-                st.image(uploaded_file, caption=f"Реф. {idx + 1}", use_container_width=True)
+                st.image(uploaded_file, caption=f"Реф. {idx + 1}", width='stretch')
 
     return uploaded_files
 
@@ -261,7 +261,7 @@ def _render_result_section():
                     result = results[model_name]
                     st.markdown(f"**Модель: `{model_name}`**")
                     if result.get('image_bytes'):
-                        st.image(result['image_bytes'], use_container_width=True)
+                        st.image(result['image_bytes'], width='stretch')
                         st.download_button(
                             label=f"📥 Завантажити ({model_name})",
                             data=result['image_bytes'],
@@ -278,7 +278,7 @@ def _render_result_section():
     elif 'generated_image' in st.session_state:
         # Fallback for old sessions or single results
         st.subheader("🖼️ Результат")
-        st.image(st.session_state['generated_image'], use_container_width=True)
+        st.image(st.session_state['generated_image'], width='stretch')
         st.download_button(
             label="📥 Завантажити зображення",
             data=st.session_state['generated_image'],

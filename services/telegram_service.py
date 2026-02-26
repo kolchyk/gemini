@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 class TelegramService:
     def __init__(self):
-        self.bot = Bot(token=settings.TELEGRAM_BOT_TOKEN) if settings.TELEGRAM_BOT_TOKEN else None
+        self.token = settings.TELEGRAM_BOT_TOKEN
         self.chat_id = settings.TELEGRAM_CHAT_ID
 
     def _truncate_caption(self, text, limit=1024):
@@ -21,18 +21,15 @@ class TelegramService:
         return text[: max(0, limit - 3)] + "..."
 
     def _run_async(self, coro):
-        """Run an async coroutine synchronously in a new event loop."""
+        """Run an async coroutine synchronously using asyncio.run for proper cleanup."""
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(coro)
-            loop.close()
+            asyncio.run(coro)
         except Exception as e:
             logger.error(f"Telegram sync wrapper error: {e}", exc_info=True)
 
     async def send_image_log(self, original_images_bytes_list, generated_image_bytes, prompt_text, file_metadata_list=None):
         """Sends image generation logs to Telegram as a media group."""
-        if not self.bot:
+        if not self.token:
             logger.warning("TELEGRAM_BOT_TOKEN not set, skipping Telegram send")
             return
 
@@ -76,27 +73,28 @@ class TelegramService:
         gen_img_io.seek(0)
 
         try:
-            if len(media_group) > 0:
-                media_group.append(InputMediaPhoto(
-                    media=gen_img_io,
-                    caption=gen_caption
-                ))
-                # Telegram media group limit: 10 items
-                await self.bot.send_media_group(chat_id=self.chat_id, media=media_group[:10])
-                logger.info(f"Successfully sent {len(media_group[:10])} images to Telegram")
-            else:
-                await self.bot.send_photo(
-                    chat_id=self.chat_id,
-                    photo=gen_img_io,
-                    caption=gen_caption
-                )
-                logger.info("Successfully sent image to Telegram")
+            async with Bot(token=self.token) as bot:
+                if len(media_group) > 0:
+                    media_group.append(InputMediaPhoto(
+                        media=gen_img_io,
+                        caption=gen_caption
+                    ))
+                    # Telegram media group limit: 10 items
+                    await bot.send_media_group(chat_id=self.chat_id, media=media_group[:10])
+                    logger.info(f"Successfully sent {len(media_group[:10])} images to Telegram")
+                else:
+                    await bot.send_photo(
+                        chat_id=self.chat_id,
+                        photo=gen_img_io,
+                        caption=gen_caption
+                    )
+                    logger.info("Successfully sent image to Telegram")
         except Exception as e:
             logger.error(f"Error sending images to Telegram: {e}", exc_info=True)
 
     async def send_text_log(self, text, title=None):
         """Sends text message to Telegram."""
-        if not self.bot:
+        if not self.token:
             logger.warning("TELEGRAM_BOT_TOKEN not set, skipping Telegram text send")
             return
 
@@ -110,7 +108,8 @@ class TelegramService:
             message = message[:3997] + "..."
 
         try:
-            await self.bot.send_message(chat_id=self.chat_id, text=message, parse_mode='HTML')
+            async with Bot(token=self.token) as bot:
+                await bot.send_message(chat_id=self.chat_id, text=message, parse_mode='HTML')
             logger.info("Successfully sent text message to Telegram")
         except Exception as e:
             logger.error(f"Error sending text to Telegram: {e}", exc_info=True)
