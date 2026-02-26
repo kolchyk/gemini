@@ -1,5 +1,6 @@
 import streamlit as st
 import time
+import concurrent.futures
 from services.image_service import ImageService
 from services.error_utils import format_error_with_retry
 from config import settings, prompts
@@ -78,6 +79,7 @@ def render_image_sidebar():
         if st.button("🧹 Очистити результат", use_container_width=True, type="secondary"):
             st.session_state.pop('generated_image', None)
             st.session_state.pop('generated_text', None)
+            st.session_state.pop('generated_results', None)
             st.rerun()
 
         st.markdown('<div class="sidebar-section-label">Документація</div>', unsafe_allow_html=True)
@@ -102,6 +104,7 @@ def _init_session_state():
         'edited_prompt_women': None,
         'edited_prompt_men': None,
         'edited_prompt_custom': None,
+        'generated_results': {},  # Map of model_name -> result_dict
     }
     for key, default_val in defaults.items():
         if key not in st.session_state:
@@ -120,13 +123,19 @@ def _render_reference_upload():
     )
 
     current_image_model = st.session_state.get('image_model', settings.IMAGE_MODEL)
-    is_imagen = current_image_model in getattr(settings, 'IMAGEN_MODELS', ())
+    # Gemini models and Nano Banana 2 use native Gemini API (generate_content)
+    is_imagen = "imagen" in current_image_model.lower() or current_image_model in getattr(settings, 'IMAGEN_MODELS', ())
+    is_gemini_image = "gemini" in current_image_model.lower() or current_image_model in getattr(settings, 'GEMINI_IMAGE_MODELS', ())
+    
+    if is_gemini_image:
+        is_imagen = False
+        
     if uploaded_files and is_imagen:
         st.info("ℹ️ Модель Imagen генерує зображення лише за текстовим описом. Референсні зображення ігноруються.")
 
     if uploaded_files:
         num_files = len(uploaded_files)
-        cols = st.columns(min(4, num_files))
+        cols = st.columns(min(6, num_files))
         for idx, uploaded_file in enumerate(uploaded_files):
             with cols[idx % len(cols)]:
                 st.image(uploaded_file, caption=f"Реф. {idx + 1}", use_container_width=True)
@@ -195,31 +204,52 @@ def _render_prompt_section():
 def _render_generate_button(image_service, prompt, uploaded_files):
     """Generate button and execution logic."""
     st.markdown('<div class="spacer-lg"></div>', unsafe_allow_html=True)
-    if st.button("🚀 Згенерувати зображення", type="primary", use_container_width=True):
+    if st.button("🚀 Згенерувати зображення (паралельно)", type="primary", use_container_width=True):
         if not prompt:
             st.error("Будь ласка, введіть промпт!")
         else:
-            with st.spinner("✨ Генеруємо ваш шедевр..."):
+            with st.spinner("✨ Генеруємо ваш шедевр у двох моделях паралельно..."):
                 try:
-                    result = image_service.generate_image(
-                        prompt=prompt,
-                        aspect_ratio=st.session_state['image_aspect_ratio'],
-                        person_images=uploaded_files,
-                        resolution=st.session_state['image_resolution'],
-                        temperature=st.session_state['image_temperature'],
-                        model=st.session_state['image_model'],
-                        thinking_level=st.session_state['image_thinking_level'],
-                        person_generation=st.session_state['image_person_generation'],
-                    )
+                    # Determine models for parallel generation
+                    # We use the selected model and another one from settings.IMAGE_MODELS if available
+                    selected_model = st.session_state['image_model']
+                    all_models = list(settings.IMAGE_MODELS)
+                    other_models = [m for m in all_models if m != selected_model]
+                    
+                    target_models = [selected_model]
+                    if other_models:
+                        target_models.append(other_models[0])
+                    
+                    def generate_with_model(model_name):
+                        return model_name, image_service.generate_image(
+                            prompt=prompt,
+                            aspect_ratio=st.session_state['image_aspect_ratio'],
+                            person_images=uploaded_files,
+                            resolution=st.session_state['image_resolution'],
+                            temperature=st.session_state['image_temperature'],
+                            model=model_name,
+                            thinking_level=st.session_state['image_thinking_level'],
+                            person_generation=st.session_state['image_person_generation'],
+                        )
 
-                    if result['image_bytes']:
-                        st.session_state['generated_image'] = result['image_bytes']
-                        if result['text_output']:
-                            st.session_state['generated_text'] = result['text_output']
-                        st.success("🎉 Зображення успішно згенеровано!")
-                        st.rerun()
-                    else:
-                        st.warning("Модель не повернула зображення. Спробуйте інший промпт.")
+                    results = {}
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=len(target_models)) as executor:
+                        future_to_model = {executor.submit(generate_with_model, m): m for m in target_models}
+                        for future in concurrent.futures.as_completed(future_to_model):
+                            model_name, result = future.result()
+                            results[model_name] = result
+
+                    st.session_state['generated_results'] = results
+                    
+                    # Backwards compatibility for single image if needed elsewhere
+                    first_model = target_models[0]
+                    if results.get(first_model, {}).get('image_bytes'):
+                        st.session_state['generated_image'] = results[first_model]['image_bytes']
+                        if results[first_model].get('text_output'):
+                            st.session_state['generated_text'] = results[first_model]['text_output']
+
+                    st.success(f"🎉 Зображення згенеровано ({', '.join(target_models)})!")
+                    st.rerun()
                 except Exception as e:
                     st.error(format_error_with_retry(e, "генерацію зображення"))
                     with st.expander("Технічні деталі"):
@@ -227,11 +257,40 @@ def _render_generate_button(image_service, prompt, uploaded_files):
 
 
 def _render_result_section():
-    """Step 3: Result display with download button."""
-    if 'generated_image' in st.session_state:
+    """Step 3: Result display with side-by-side models."""
+    results = st.session_state.get('generated_results', {})
+    
+    if results:
+        st.subheader("🖼️ Результати")
+        
+        model_names = list(results.keys())
+        num_models = len(model_names)
+        
+        if num_models > 0:
+            cols = st.columns(num_models)
+            for idx, model_name in enumerate(model_names):
+                with cols[idx]:
+                    result = results[model_name]
+                    st.markdown(f"**Модель: `{model_name}`**")
+                    if result.get('image_bytes'):
+                        st.image(result['image_bytes'], use_container_width=True)
+                        st.download_button(
+                            label=f"📥 Завантажити ({model_name})",
+                            data=result['image_bytes'],
+                            file_name=f"generated_{model_name}_{int(time.time())}.png",
+                            mime="image/png",
+                            use_container_width=True,
+                            key=f"download_{model_name}_{idx}"
+                        )
+                        if result.get('text_output'):
+                            with st.expander(f"Опис від {model_name}"):
+                                st.write(result['text_output'])
+                    else:
+                        st.warning(f"Модель `{model_name}` не повернула зображення.")
+    elif 'generated_image' in st.session_state:
+        # Fallback for old sessions or single results
         st.subheader("🖼️ Результат")
         st.image(st.session_state['generated_image'], use_container_width=True)
-
         st.download_button(
             label="📥 Завантажити зображення",
             data=st.session_state['generated_image'],
@@ -239,10 +298,6 @@ def _render_result_section():
             mime="image/png",
             use_container_width=True
         )
-
-        if 'generated_text' in st.session_state:
-            with st.expander("Опис від моделі"):
-                st.write(st.session_state['generated_text'])
     else:
         st.markdown("""
             <div class="empty-state">

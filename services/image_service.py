@@ -46,7 +46,17 @@ class ImageService:
             raise ValueError("Prompt is required for image generation.")
 
         model_name = model or settings.IMAGE_MODEL
-        is_imagen = model_name in getattr(settings, "IMAGEN_MODELS", ())
+        
+        # Determine if we should use Imagen API (generate_images) or Gemini API (generate_content)
+        # Gemini 2.x/3.x image models and Nano Banana use generate_content with response_modalities=['IMAGE']
+        is_imagen = "imagen" in model_name.lower() or model_name in getattr(settings, "IMAGEN_MODELS", ())
+        is_gemini_image = "gemini" in model_name.lower() or model_name in getattr(settings, "GEMINI_IMAGE_MODELS", ())
+        
+        # If it's a Gemini model, it's definitely NOT an Imagen model
+        if is_gemini_image:
+            is_imagen = False
+            
+        logger.debug(f"Generating image with model: {model_name}, is_imagen: {is_imagen}")
 
         if is_imagen:
             return self._generate_with_imagen(
