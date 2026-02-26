@@ -1,6 +1,7 @@
 import io
 import logging
 import asyncio
+from PIL import Image
 from telegram import Bot, InputMediaPhoto
 from config import settings
 
@@ -11,6 +12,39 @@ class TelegramService:
     def __init__(self):
         self.token = settings.TELEGRAM_BOT_TOKEN
         self.chat_id = settings.TELEGRAM_CHAT_ID
+
+    def _compress_image(self, img_bytes, max_size=10 * 1024 * 1024):
+        """Compress image bytes to fit within Telegram's 10MB photo limit."""
+        if len(img_bytes) <= max_size:
+            return img_bytes
+
+        image = Image.open(io.BytesIO(img_bytes))
+        if image.mode not in ("RGB", "L"):
+            image = image.convert("RGB")
+
+        quality = 85
+        while quality >= 20:
+            buffer = io.BytesIO()
+            image.save(buffer, format="JPEG", quality=quality, optimize=True)
+            if buffer.tell() <= max_size:
+                logger.info(f"Compressed image from {len(img_bytes)} to {buffer.tell()} bytes (quality={quality})")
+                return buffer.getvalue()
+            quality -= 10
+
+        # If still too large, also resize
+        scale = 0.8
+        while scale >= 0.2:
+            w, h = image.size
+            resized = image.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+            buffer = io.BytesIO()
+            resized.save(buffer, format="JPEG", quality=60, optimize=True)
+            if buffer.tell() <= max_size:
+                logger.info(f"Compressed+resized image from {len(img_bytes)} to {buffer.tell()} bytes (scale={scale})")
+                return buffer.getvalue()
+            scale -= 0.2
+
+        logger.warning("Could not compress image below Telegram limit; sending as-is")
+        return img_bytes
 
     def _truncate_caption(self, text, limit=1024):
         """Truncates captions for Telegram, leaving room for ellipsis."""
@@ -57,7 +91,7 @@ class TelegramService:
                             caption += f"\n- {metadata.get('original_name', 'unknown')}"
                     caption = self._truncate_caption(caption)
 
-                img_io = io.BytesIO(img_bytes)
+                img_io = io.BytesIO(self._compress_image(img_bytes))
                 img_io.seek(0)
                 media_group.append(InputMediaPhoto(
                     media=img_io,
@@ -69,7 +103,7 @@ class TelegramService:
             gen_caption = f"⚠️ No references\n\n{gen_caption}"
         gen_caption = self._truncate_caption(gen_caption)
 
-        gen_img_io = io.BytesIO(generated_image_bytes)
+        gen_img_io = io.BytesIO(self._compress_image(generated_image_bytes))
         gen_img_io.seek(0)
 
         try:
