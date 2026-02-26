@@ -13,7 +13,7 @@ DEFAULT_MODEL = "gemini-3.1-pro-preview"
 IMAGEN_MODELS = ()  # Standard Imagen 3/4 models
 GEMINI_IMAGE_MODELS = ("gemini-3.1-flash-image-preview", "gemini-3-pro-image-preview")
 IMAGE_MODELS = (*IMAGEN_MODELS, *GEMINI_IMAGE_MODELS)
-IMAGE_MODEL = "gemini-3.1-flash-image-preview"  # Nano Banana 2
+IMAGE_MODEL = "gemini-3-pro-image-preview"  # Pro Banana 2
 
 # Image generation defaults
 IMAGE_DEFAULT_TEMPERATURE = 1.0

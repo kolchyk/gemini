@@ -9,17 +9,25 @@ from config import settings, prompts
 def render_image_sidebar():
     """Renders the sidebar for image generator."""
     with st.sidebar:
-        st.markdown('<div class="model-badge">🍌 Nano Banana 2</div>', unsafe_allow_html=True)
+        # Dynamic badge based on selected mode
+        mode = st.session_state.get('image_generation_mode', 'Pro')
+        badge_text = f"🍌 Nano Banana 2 {mode}" if mode != "Обидві" else "🍌 Nano Banana 2 (Dual)"
+        st.markdown(f'<div class="model-badge">{badge_text}</div>', unsafe_allow_html=True)
 
-        current_model = st.session_state.get('image_model', settings.IMAGE_MODEL)
-        model_index = settings.IMAGE_MODELS.index(current_model) if current_model in settings.IMAGE_MODELS else 0
-        image_model = st.selectbox(
-            "Модель:",
-            options=settings.IMAGE_MODELS,
-            index=model_index,
-            key="image_model_selector"
+        image_generation_mode = st.selectbox(
+            "Режим генерації:",
+            options=["Flash", "Pro", "Обидві"],
+            index=["Flash", "Pro", "Обидві"].index(mode),
+            key="image_generation_mode_selector"
         )
-        st.session_state['image_model'] = image_model
+        st.session_state['image_generation_mode'] = image_generation_mode
+
+        # Update underlying image_model for backward compatibility if needed
+        if image_generation_mode == "Flash":
+            st.session_state['image_model'] = settings.GEMINI_IMAGE_MODELS[0]
+        elif image_generation_mode == "Pro":
+            st.session_state['image_model'] = settings.GEMINI_IMAGE_MODELS[1]
+        # For "Обидві", we'll handle it in the generation button logic
 
         st.markdown('<div class="sidebar-section-label">Параметри</div>', unsafe_allow_html=True)
 
@@ -100,6 +108,7 @@ def _init_session_state():
         'image_temperature': settings.IMAGE_DEFAULT_TEMPERATURE,
         'image_thinking_level': settings.IMAGE_DEFAULT_THINKING_LEVEL,
         'image_person_generation': settings.IMAGE_DEFAULT_PERSON_GENERATION,
+        'image_generation_mode': 'Pro',  # 'Flash' | 'Pro' | 'Обидві'
         'prompt_type': 'custom',
         'edited_prompt_women': None,
         'edited_prompt_men': None,
@@ -204,21 +213,32 @@ def _render_prompt_section():
 def _render_generate_button(image_service, prompt, uploaded_files):
     """Generate button and execution logic."""
     st.markdown('<div class="spacer-lg"></div>', unsafe_allow_html=True)
-    if st.button("🚀 Згенерувати зображення (паралельно)", type="primary", use_container_width=True):
+    
+    mode = st.session_state.get('image_generation_mode', 'Pro')
+    button_label = "🚀 Згенерувати зображення"
+    if mode == "Обидві":
+        button_label += " (паралельно)"
+    
+    if st.button(button_label, type="primary", use_container_width=True):
         if not prompt:
             st.error("Будь ласка, введіть промпт!")
         else:
-            with st.spinner("✨ Генеруємо ваш шедевр у двох моделях паралельно..."):
+            spinner_text = f"✨ Генеруємо ваш шедевр ({mode})..."
+            if mode == "Обидві":
+                spinner_text = "✨ Генеруємо ваш шедевр у двох моделях паралельно..."
+                
+            with st.spinner(spinner_text):
                 try:
-                    # Determine models for parallel generation
-                    # We use the selected model and another one from settings.IMAGE_MODELS if available
-                    selected_model = st.session_state['image_model']
-                    all_models = list(settings.IMAGE_MODELS)
-                    other_models = [m for m in all_models if m != selected_model]
+                    # Determine target models based on generation mode
+                    flash_model = settings.GEMINI_IMAGE_MODELS[0]
+                    pro_model = settings.GEMINI_IMAGE_MODELS[1]
                     
-                    target_models = [selected_model]
-                    if other_models:
-                        target_models.append(other_models[0])
+                    if mode == "Flash":
+                        target_models = [flash_model]
+                    elif mode == "Pro":
+                        target_models = [pro_model]
+                    else:  # "Обидві"
+                        target_models = [flash_model, pro_model]
 
                     # Capture session state values in main thread; worker threads cannot
                     # access st.session_state (KeyError / wrong context on Heroku etc.)
