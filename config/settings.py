@@ -11,7 +11,7 @@ DEFAULT_MODEL = "gemini-3.1-pro-preview"
 
 # Imagen models use generate_images() API; Gemini image models use generate_content_stream()
 IMAGEN_MODELS = ()  # Standard Imagen 3/4 models
-GEMINI_IMAGE_MODELS = ("gemini-3.1-flash-image-preview", "gemini-3-pro-image-preview", "gemini-2.5-flash-image")
+GEMINI_IMAGE_MODELS = ("gemini-3.1-flash-image-preview", "gemini-3-pro-image-preview")
 IMAGE_MODELS = (*IMAGEN_MODELS, *GEMINI_IMAGE_MODELS)
 IMAGE_MODEL = "gemini-3.1-flash-image-preview"  # Nano Banana 2
 

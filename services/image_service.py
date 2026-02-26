@@ -94,10 +94,6 @@ class ImageService:
             # Gemini 3 models (Pro Image, Flash Image) use thinking_level
             # Note: "MINIMAL" might require thought_signature for multi-turn
             thinking_config = types.ThinkingConfig(thinking_level=thinking_level)
-        elif "gemini-2.5" in model_name:
-            # Gemini 2.5 models use thinking_budget
-            budget_map = {"MINIMAL": 0, "LOW": 4096, "MEDIUM": 8192, "HIGH": 16384}
-            thinking_config = types.ThinkingConfig(thinking_budget=budget_map.get(thinking_level, 8192))
 
         # Config following Google reference code pattern
         generate_content_config = types.GenerateContentConfig(
