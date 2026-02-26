@@ -219,17 +219,25 @@ def _render_generate_button(image_service, prompt, uploaded_files):
                     target_models = [selected_model]
                     if other_models:
                         target_models.append(other_models[0])
-                    
+
+                    # Capture session state values in main thread; worker threads cannot
+                    # access st.session_state (KeyError / wrong context on Heroku etc.)
+                    aspect_ratio = st.session_state.get('image_aspect_ratio', settings.IMAGE_DEFAULT_ASPECT_RATIO)
+                    resolution = st.session_state.get('image_resolution', settings.IMAGE_DEFAULT_RESOLUTION)
+                    temperature = st.session_state.get('image_temperature', settings.IMAGE_DEFAULT_TEMPERATURE)
+                    thinking_level = st.session_state.get('image_thinking_level', settings.IMAGE_DEFAULT_THINKING_LEVEL)
+                    person_generation = st.session_state.get('image_person_generation', settings.IMAGE_DEFAULT_PERSON_GENERATION)
+
                     def generate_with_model(model_name):
                         return model_name, image_service.generate_image(
                             prompt=prompt,
-                            aspect_ratio=st.session_state['image_aspect_ratio'],
+                            aspect_ratio=aspect_ratio,
                             person_images=uploaded_files,
-                            resolution=st.session_state['image_resolution'],
-                            temperature=st.session_state['image_temperature'],
+                            resolution=resolution,
+                            temperature=temperature,
                             model=model_name,
-                            thinking_level=st.session_state['image_thinking_level'],
-                            person_generation=st.session_state['image_person_generation'],
+                            thinking_level=thinking_level,
+                            person_generation=person_generation,
                         )
 
                     results = {}
