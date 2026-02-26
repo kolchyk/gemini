@@ -41,15 +41,7 @@ def render_image_sidebar():
         )
         st.session_state['image_aspect_ratio'] = aspect_ratio
 
-        resolution = st.selectbox(
-            "Роздільність:",
-            options=["1K", "2K", "4K"],
-            index=["1K", "2K", "4K"].index(
-                st.session_state.get('image_resolution', settings.IMAGE_DEFAULT_RESOLUTION)
-            ),
-            key="image_resolution_selector"
-        )
-        st.session_state['image_resolution'] = resolution
+        st.session_state['image_resolution'] = "2K"
 
         temperature = st.slider(
             "Temperature:",
@@ -61,17 +53,7 @@ def render_image_sidebar():
         )
         st.session_state['image_temperature'] = temperature
 
-        if image_generation_mode in ("Flash", "Обидві"):
-            st.markdown('<div class="sidebar-section-label">Розширені</div>', unsafe_allow_html=True)
-            thinking_level = st.selectbox(
-                "Thinking:",
-                options=["LOW", "MEDIUM", "HIGH"],
-                index=["LOW", "MEDIUM", "HIGH"].index(
-                    st.session_state.get('image_thinking_level', settings.IMAGE_DEFAULT_THINKING_LEVEL)
-                ),
-                key="image_thinking_level_selector"
-            )
-            st.session_state['image_thinking_level'] = thinking_level
+        st.session_state['image_thinking_level'] = "HIGH"
 
         st.divider()
         if st.button("🧹 Очистити результат", use_container_width=True, type="secondary"):
@@ -97,7 +79,6 @@ def _init_session_state():
         'image_resolution': settings.IMAGE_DEFAULT_RESOLUTION,
         'image_temperature': settings.IMAGE_DEFAULT_TEMPERATURE,
         'image_thinking_level': settings.IMAGE_DEFAULT_THINKING_LEVEL,
-        'image_person_generation': settings.IMAGE_DEFAULT_PERSON_GENERATION,
         'image_generation_mode': 'Pro',  # 'Flash' | 'Pro' | 'Обидві'
         'prompt_type': 'custom',
         'edited_prompt_women': None,

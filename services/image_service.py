@@ -23,8 +23,7 @@ class ImageService:
         resolution="1K",
         temperature=1.0,
         model=None,
-        thinking_level="MINIMAL",
-        person_generation="ALLOW_ALL",
+        thinking_level="HIGH",
     ):
         """
         Generates an image based on a prompt and optional reference images.
@@ -37,7 +36,6 @@ class ImageService:
             temperature: Creativity temperature (0.0 to 1.0).
             model: Model name override.
             thinking_level: Thinking level for Flash models ("LOW", "MEDIUM", "HIGH").
-            person_generation: Person generation policy ("ALLOW_ALL", "DONT_ALLOW", "ALLOW_ADULT").
 
         Returns:
             dict with 'image_bytes' (bytes or None) and 'text_output' (str).
@@ -65,7 +63,6 @@ class ImageService:
                 resolution=resolution,
                 model_name=model_name,
                 person_images=person_images,
-                person_generation=person_generation,
             )
 
         file_parts = []
@@ -122,7 +119,6 @@ class ImageService:
             image_config=types.ImageConfig(
                 aspect_ratio=aspect_ratio,
                 image_size=resolution,
-                person_generation=person_generation or "",
             ),
             response_modalities=["TEXT", "IMAGE"],
             temperature=temperature,
@@ -167,13 +163,12 @@ class ImageService:
             'text_output': "".join(text_output)
         }
 
-    def _generate_with_imagen(self, prompt, aspect_ratio, resolution, model_name, person_images=None, person_generation=None):
+    def _generate_with_imagen(self, prompt, aspect_ratio, resolution, model_name, person_images=None):
         """Generates an image using Imagen's generate_images() API (text-to-image only)."""
         config = types.GenerateImagesConfig(
             number_of_images=1,
             aspect_ratio=aspect_ratio,
             image_size=resolution,
-            person_generation=person_generation.lower() if person_generation else None,
         )
         response = self.client.models.generate_images(
             model=model_name,
