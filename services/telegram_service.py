@@ -13,21 +13,45 @@ class TelegramService:
         self.token = settings.TELEGRAM_BOT_TOKEN
         self.chat_id = settings.TELEGRAM_CHAT_ID
 
-    def _compress_image(self, img_bytes, max_size=10 * 1024 * 1024):
-        """Compress image bytes to fit within Telegram's 10MB photo limit."""
-        if len(img_bytes) <= max_size:
-            return img_bytes
+    def _fix_image_dimensions(self, image):
+        """Resize image to comply with Telegram's dimension limits (max 10000px, max 20:1 ratio)."""
+        w, h = image.size
+        max_side = 10000
+        max_ratio = 20.0
 
+        # Clamp maximum side
+        if w > max_side or h > max_side:
+            scale = min(max_side / w, max_side / h)
+            w, h = int(w * scale), int(h * scale)
+
+        # Clamp aspect ratio
+        if w / h > max_ratio:
+            w = int(h * max_ratio)
+        elif h / w > max_ratio:
+            h = int(w * max_ratio)
+
+        if (w, h) != image.size:
+            logger.info(f"Resizing image from {image.size} to ({w}, {h}) for Telegram dimension limits")
+            image = image.resize((w, h), Image.LANCZOS)
+
+        return image
+
+    def _compress_image(self, img_bytes, max_size=10 * 1024 * 1024):
+        """Compress image bytes to fit within Telegram's photo limits (10MB, max 10000px, max 20:1 ratio)."""
         image = Image.open(io.BytesIO(img_bytes))
         if image.mode not in ("RGB", "L"):
             image = image.convert("RGB")
 
+        image = self._fix_image_dimensions(image)
+
+        original_size = len(img_bytes)
         quality = 85
         while quality >= 20:
             buffer = io.BytesIO()
             image.save(buffer, format="JPEG", quality=quality, optimize=True)
             if buffer.tell() <= max_size:
-                logger.info(f"Compressed image from {len(img_bytes)} to {buffer.tell()} bytes (quality={quality})")
+                if quality < 85:
+                    logger.info(f"Compressed image from {original_size} to {buffer.tell()} bytes (quality={quality})")
                 return buffer.getvalue()
             quality -= 10
 
