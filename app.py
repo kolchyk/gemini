@@ -1,7 +1,7 @@
 import streamlit as st
 
 from config.styles import CUSTOM_CSS
-from components.image_generator import render_image_generator, render_image_sidebar
+from components.image_generator import render_image_generator
 
 # Page configuration
 st.set_page_config(
@@ -22,8 +22,6 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# Render sidebar and main content
-render_image_sidebar()
 render_image_generator()
 
 

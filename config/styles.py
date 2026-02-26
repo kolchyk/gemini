@@ -38,37 +38,6 @@ CUSTOM_CSS = """
             margin-left: auto;
         }
 
-        /* ── Sidebar ── */
-        [data-testid="stSidebar"] {
-            border-right: 1px solid var(--ai-studio-border);
-        }
-
-        .sidebar-section-label {
-            font-size: 0.7rem;
-            color: gray;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin: 1.5rem 0 0.75rem 0;
-            font-weight: 700;
-            padding-bottom: 0.25rem;
-            border-bottom: 1px solid var(--ai-studio-border);
-        }
-
-        /* ── Model Badge ── */
-        .model-badge {
-            background: linear-gradient(135deg, var(--ai-studio-primary), #4285f4);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 10px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 2px 8px rgba(26, 115, 232, 0.2);
-            letter-spacing: 0.3px;
-        }
 
         /* ── Section Cards ── */
         .section-card {

@@ -6,33 +6,28 @@ from services.error_utils import format_error_with_retry
 from config import settings, prompts
 
 
-def render_image_sidebar():
-    """Renders the sidebar for image generator."""
-    with st.sidebar:
-        # Dynamic badge based on selected mode
-        mode = st.session_state.get('image_generation_mode', 'Pro')
-        badge_text = f"🍌 Nano Banana 2 {mode}" if mode != "Обидві" else "🍌 Nano Banana 2 (Dual)"
-        st.markdown(f'<div class="model-badge">{badge_text}</div>', unsafe_allow_html=True)
 
+def _render_controls_row():
+    """Renders generation mode, aspect ratio, and temperature controls inline."""
+    mode = st.session_state.get('image_generation_mode', 'Pro')
+    col_mode, col_ratio, col_temp = st.columns([1, 1, 2])
+
+    with col_mode:
         image_generation_mode = st.selectbox(
-            "Режим генерації:",
+            "Режим генерації",
             options=["Flash", "Pro", "Обидві"],
             index=["Flash", "Pro", "Обидві"].index(mode),
             key="image_generation_mode_selector"
         )
         st.session_state['image_generation_mode'] = image_generation_mode
-
-        # Update underlying image_model for backward compatibility if needed
         if image_generation_mode == "Flash":
             st.session_state['image_model'] = settings.GEMINI_IMAGE_MODELS[0]
         elif image_generation_mode == "Pro":
             st.session_state['image_model'] = settings.GEMINI_IMAGE_MODELS[1]
-        # For "Обидві", we'll handle it in the generation button logic
 
-        st.markdown('<div class="sidebar-section-label">Параметри</div>', unsafe_allow_html=True)
-
+    with col_ratio:
         aspect_ratio = st.selectbox(
-            "Співвідношення:",
+            "Співвідношення",
             options=["1:1", "16:9", "9:16", "4:3", "3:4"],
             index=["1:1", "16:9", "9:16", "4:3", "3:4"].index(
                 st.session_state.get('image_aspect_ratio', settings.IMAGE_DEFAULT_ASPECT_RATIO)
@@ -41,10 +36,9 @@ def render_image_sidebar():
         )
         st.session_state['image_aspect_ratio'] = aspect_ratio
 
-        st.session_state['image_resolution'] = "2K"
-
+    with col_temp:
         temperature = st.slider(
-            "Temperature:",
+            "Temperature",
             min_value=0.0,
             max_value=1.0,
             value=st.session_state.get('image_temperature', settings.IMAGE_DEFAULT_TEMPERATURE),
@@ -53,22 +47,10 @@ def render_image_sidebar():
         )
         st.session_state['image_temperature'] = temperature
 
-        st.session_state['image_thinking_level'] = "HIGH"
+    st.session_state['image_resolution'] = "2K"
+    st.session_state['image_thinking_level'] = "HIGH"
 
-        st.divider()
-        if st.button("🧹 Очистити результат", use_container_width=True, type="secondary"):
-            st.session_state.pop('generated_image', None)
-            st.session_state.pop('generated_text', None)
-            st.session_state.pop('generated_results', None)
-            st.rerun()
-
-        st.markdown('<div class="sidebar-section-label">Документація</div>', unsafe_allow_html=True)
-        st.markdown("""
-        - [Imagen 4 Guide](https://ai.google.dev/gemini-api/docs/imagen)
-        - [Prompt Engineering](https://ai.google.dev/gemini-api/docs/prompting-strategies)
-
-        *Nano Banana 2 — високоякісна генерація зображень.*
-        """, unsafe_allow_html=True)
+    st.divider()
 
 
 def _init_session_state():
@@ -184,74 +166,82 @@ def _render_prompt_section():
 def _render_generate_button(image_service, prompt, uploaded_files):
     """Generate button and execution logic."""
     st.markdown('<div class="spacer-lg"></div>', unsafe_allow_html=True)
-    
+
     mode = st.session_state.get('image_generation_mode', 'Pro')
     button_label = "🚀 Згенерувати зображення"
     if mode == "Обидві":
         button_label += " (паралельно)"
-    
-    if st.button(button_label, type="primary", use_container_width=True):
-        if not prompt:
-            st.error("Будь ласка, введіть промпт!")
-        else:
-            spinner_text = f"✨ Генеруємо ваш шедевр ({mode})..."
-            if mode == "Обидві":
-                spinner_text = "✨ Генеруємо ваш шедевр у двох моделях паралельно..."
-                
-            with st.spinner(spinner_text):
-                try:
-                    # Determine target models based on generation mode
-                    flash_model = settings.GEMINI_IMAGE_MODELS[0]
-                    pro_model = settings.GEMINI_IMAGE_MODELS[1]
-                    
-                    if mode == "Flash":
-                        target_models = [flash_model]
-                    elif mode == "Pro":
-                        target_models = [pro_model]
-                    else:  # "Обидві"
-                        target_models = [flash_model, pro_model]
 
-                    # Capture session state values in main thread; worker threads cannot
-                    # access st.session_state (KeyError / wrong context on Heroku etc.)
-                    aspect_ratio = st.session_state.get('image_aspect_ratio', settings.IMAGE_DEFAULT_ASPECT_RATIO)
-                    resolution = st.session_state.get('image_resolution', settings.IMAGE_DEFAULT_RESOLUTION)
-                    temperature = st.session_state.get('image_temperature', settings.IMAGE_DEFAULT_TEMPERATURE)
-                    thinking_level = st.session_state.get('image_thinking_level', settings.IMAGE_DEFAULT_THINKING_LEVEL)
+    col_gen, col_clear = st.columns([4, 1])
 
-                    def generate_with_model(model_name):
-                        model_thinking = thinking_level if "flash" in model_name.lower() else None
-                        return model_name, image_service.generate_image(
-                            prompt=prompt,
-                            aspect_ratio=aspect_ratio,
-                            person_images=uploaded_files,
-                            resolution=resolution,
-                            temperature=temperature,
-                            model=model_name,
-                            thinking_level=model_thinking,
-                        )
+    with col_clear:
+        if st.button("🧹 Очистити", use_container_width=True, type="secondary"):
+            st.session_state.pop('generated_image', None)
+            st.session_state.pop('generated_text', None)
+            st.session_state.pop('generated_results', None)
+            st.rerun()
 
-                    results = {}
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=len(target_models)) as executor:
-                        future_to_model = {executor.submit(generate_with_model, m): m for m in target_models}
-                        for future in concurrent.futures.as_completed(future_to_model):
-                            model_name, result = future.result()
-                            results[model_name] = result
+    with col_gen:
+        if st.button(button_label, type="primary", use_container_width=True):
+            if not prompt:
+                st.error("Будь ласка, введіть промпт!")
+            else:
+                spinner_text = f"✨ Генеруємо ваш шедевр ({mode})..."
+                if mode == "Обидві":
+                    spinner_text = "✨ Генеруємо ваш шедевр у двох моделях паралельно..."
 
-                    st.session_state['generated_results'] = results
-                    
-                    # Backwards compatibility for single image if needed elsewhere
-                    first_model = target_models[0]
-                    if results.get(first_model, {}).get('image_bytes'):
-                        st.session_state['generated_image'] = results[first_model]['image_bytes']
-                        if results[first_model].get('text_output'):
-                            st.session_state['generated_text'] = results[first_model]['text_output']
+                with st.spinner(spinner_text):
+                    try:
+                        flash_model = settings.GEMINI_IMAGE_MODELS[0]
+                        pro_model = settings.GEMINI_IMAGE_MODELS[1]
 
-                    st.success(f"🎉 Зображення згенеровано ({', '.join(target_models)})!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(format_error_with_retry(e, "генерацію зображення"))
-                    with st.expander("Технічні деталі"):
-                        st.exception(e)
+                        if mode == "Flash":
+                            target_models = [flash_model]
+                        elif mode == "Pro":
+                            target_models = [pro_model]
+                        else:  # "Обидві"
+                            target_models = [flash_model, pro_model]
+
+                        # Capture session state values in main thread; worker threads cannot
+                        # access st.session_state (KeyError / wrong context on Heroku etc.)
+                        aspect_ratio = st.session_state.get('image_aspect_ratio', settings.IMAGE_DEFAULT_ASPECT_RATIO)
+                        resolution = st.session_state.get('image_resolution', settings.IMAGE_DEFAULT_RESOLUTION)
+                        temperature = st.session_state.get('image_temperature', settings.IMAGE_DEFAULT_TEMPERATURE)
+                        thinking_level = st.session_state.get('image_thinking_level', settings.IMAGE_DEFAULT_THINKING_LEVEL)
+
+                        def generate_with_model(model_name):
+                            model_thinking = thinking_level if "flash" in model_name.lower() else None
+                            return model_name, image_service.generate_image(
+                                prompt=prompt,
+                                aspect_ratio=aspect_ratio,
+                                person_images=uploaded_files,
+                                resolution=resolution,
+                                temperature=temperature,
+                                model=model_name,
+                                thinking_level=model_thinking,
+                            )
+
+                        results = {}
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=len(target_models)) as executor:
+                            future_to_model = {executor.submit(generate_with_model, m): m for m in target_models}
+                            for future in concurrent.futures.as_completed(future_to_model):
+                                model_name, result = future.result()
+                                results[model_name] = result
+
+                        st.session_state['generated_results'] = results
+
+                        first_model = target_models[0]
+                        if results.get(first_model, {}).get('image_bytes'):
+                            st.session_state['generated_image'] = results[first_model]['image_bytes']
+                            if results[first_model].get('text_output'):
+                                st.session_state['generated_text'] = results[first_model]['text_output']
+
+                        st.success(f"🎉 Зображення згенеровано ({', '.join(target_models)})!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(format_error_with_retry(e, "генерацію зображення"))
+                        with st.expander("Технічні деталі"):
+                            st.exception(e)
 
 
 def _render_result_section():
@@ -311,6 +301,7 @@ def render_image_generator():
     _init_session_state()
     image_service = ImageService()
 
+    _render_controls_row()
     uploaded_files = _render_reference_upload()
     prompt = _render_prompt_section()
     _render_generate_button(image_service, prompt, uploaded_files)
