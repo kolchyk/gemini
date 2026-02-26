@@ -61,12 +61,12 @@ def render_image_sidebar():
         )
         st.session_state['image_temperature'] = temperature
 
-        if image_generation_mode in ("Pro", "Обидві"):
+        if image_generation_mode in ("Flash", "Обидві"):
             st.markdown('<div class="sidebar-section-label">Розширені</div>', unsafe_allow_html=True)
             thinking_level = st.selectbox(
                 "Thinking:",
-                options=["MINIMAL", "LOW", "MEDIUM", "HIGH"],
-                index=["MINIMAL", "LOW", "MEDIUM", "HIGH"].index(
+                options=["LOW", "MEDIUM", "HIGH"],
+                index=["LOW", "MEDIUM", "HIGH"].index(
                     st.session_state.get('image_thinking_level', settings.IMAGE_DEFAULT_THINKING_LEVEL)
                 ),
                 key="image_thinking_level_selector"
@@ -238,7 +238,7 @@ def _render_generate_button(image_service, prompt, uploaded_files):
                     thinking_level = st.session_state.get('image_thinking_level', settings.IMAGE_DEFAULT_THINKING_LEVEL)
 
                     def generate_with_model(model_name):
-                        model_thinking = None if "pro" not in model_name.lower() else thinking_level
+                        model_thinking = thinking_level if "flash" in model_name.lower() else None
                         return model_name, image_service.generate_image(
                             prompt=prompt,
                             aspect_ratio=aspect_ratio,

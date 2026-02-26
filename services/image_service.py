@@ -36,7 +36,7 @@ class ImageService:
             resolution: Image size (e.g., "1K", "2K", "4K").
             temperature: Creativity temperature (0.0 to 1.0).
             model: Model name override.
-            thinking_level: Thinking level ("MINIMAL", "LOW", "MEDIUM", "HIGH").
+            thinking_level: Thinking level for Flash models ("LOW", "MEDIUM", "HIGH").
             person_generation: Person generation policy ("ALLOW_ALL", "DONT_ALLOW", "ALLOW_ADULT").
 
         Returns:
@@ -99,21 +99,34 @@ class ImageService:
         parts_list = file_parts + [types.Part.from_text(text=prompt)]
         contents = [types.Content(role="user", parts=parts_list)]
 
-        # Only Pro models support ThinkingConfig; Flash models raise INVALID_ARGUMENT
-        thinking_config = None
-        is_pro_model = "pro" in model_name.lower()
-        if is_pro_model and thinking_level:
-            thinking_config = types.ThinkingConfig(thinking_level=thinking_level)
+        is_flash_model = "flash" in model_name.lower()
 
-        # Config following Google reference code pattern
+        thinking_config = None
+        if is_flash_model and thinking_level:
+            thinking_config = types.ThinkingConfig(
+                thinking_level=thinking_level,
+                include_thoughts=False,
+            )
+
+        safety_settings = None
+        if is_flash_model:
+            safety_settings = [
+                types.SafetySetting(
+                    category="HARM_CATEGORY_DANGEROUS_CONTENT",
+                    threshold="BLOCK_ONLY_HIGH",
+                ),
+            ]
+
         generate_content_config = types.GenerateContentConfig(
             thinking_config=thinking_config,
             image_config=types.ImageConfig(
                 aspect_ratio=aspect_ratio,
                 image_size=resolution,
+                person_generation=person_generation or "",
             ),
             response_modalities=["TEXT", "IMAGE"],
             temperature=temperature,
+            safety_settings=safety_settings,
         )
 
         image_bytes = None
