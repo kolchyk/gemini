@@ -79,6 +79,7 @@ def _init_session_state():
         'edited_prompt_women': None,
         'edited_prompt_men': None,
         'edited_prompt_custom': None,
+        'edited_prompt_darnytsia': None,
         'generated_results': {},  # Map of model_name -> result_dict
     }
     for key, default_val in defaults.items():
@@ -113,8 +114,8 @@ def _render_prompt_section():
     with st.container(border=True):
         st.subheader("✍️ Крок 2: Промпт")
 
-        prompt_type_options = ["З нуля (Власний промпт)", "Жінки", "Чоловіки"]
-        prompt_type_index_map = {'custom': 0, 'women': 1, 'men': 2}
+        prompt_type_options = ["З нуля (Власний промпт)", "Жінки", "Чоловіки", "Darnytsia Presentation Expert"]
+        prompt_type_index_map = {'custom': 0, 'women': 1, 'men': 2, 'darnytsia': 3}
         current_index = prompt_type_index_map.get(st.session_state['prompt_type'], 0)
 
         prompt_type = st.radio(
@@ -122,14 +123,15 @@ def _render_prompt_section():
             prompt_type_options,
             index=current_index,
             horizontal=True,
-            help="'З нуля' — для створення зображень з нуля, 'Жінки'/'Чоловіки' — для редагування фото з референсами.",
+            help="'З нуля' — для зображень з нуля, 'Жінки'/'Чоловіки' — для редагування фото, 'Darnytsia' — для адаптації корпоративних слайдів.",
             key="prompt_type_selector"
         )
 
         type_map = {
             "З нуля (Власний промпт)": 'custom',
             "Жінки": 'women',
-            "Чоловіки": 'men'
+            "Чоловіки": 'men',
+            "Darnytsia Presentation Expert": 'darnytsia',
         }
         current_prompt_type = type_map[prompt_type]
 
@@ -139,33 +141,60 @@ def _render_prompt_section():
                 st.session_state[f'edited_prompt_{st.session_state["prompt_type"]}'] = st.session_state[old_prompt_key]
             st.session_state['prompt_type'] = current_prompt_type
 
-        # Determine prompt
-        prompt_map = {
-            'women': (prompts.PROMPT_WOMEN, st.session_state['edited_prompt_women']),
-            'men': (prompts.PROMPT_MEN, st.session_state['edited_prompt_men']),
-            'custom': (prompts.PROMPT_CUSTOM, st.session_state['edited_prompt_custom']),
-        }
-        base_prompt, edited_prompt = prompt_map[st.session_state['prompt_type']]
-        current_prompt_value = edited_prompt if edited_prompt is not None else base_prompt
+        if current_prompt_type == 'darnytsia':
+            with st.expander("📋 Системна конфігурація (Darnytsia Corporate Identity)", expanded=False):
+                st.info("Ця інструкція зашита в систему і застосовується до ваших даних автоматично.")
+                st.code(prompts.PROMPT_DARNYTSIA, language="text")
 
-        prompt_key = f"prompt_text_area_{st.session_state['prompt_type']}"
-        prompt = st.text_area(
-            "Промпт:",
-            value=current_prompt_value,
-            height=150,
-            placeholder="Опишіть що згенерувати...",
-            key=prompt_key
-        )
+            current_user_data = st.session_state.get('edited_prompt_darnytsia') or ""
+            user_data = st.text_area(
+                "Ваші сирі дані для слайду:",
+                value=current_user_data,
+                height=150,
+                placeholder=(
+                    "Введіть ваші дані. Наприклад:\n\n"
+                    "Citramon sales Jan: 2.5M UAH (plan 2.3M = 109%), "
+                    "Feb: 2.1M (plan 2.4M = 88%), GR% YTD +15%"
+                ),
+                key="darnytsia_user_data"
+            )
 
-        col_reset, _ = st.columns([1, 2])
-        with col_reset:
-            if st.button("↩️ Скинути промпт", use_container_width=True):
-                st.session_state[f'edited_prompt_{st.session_state["prompt_type"]}'] = base_prompt
-                st.rerun()
+            col_reset, _ = st.columns([1, 2])
+            with col_reset:
+                if st.button("↩️ Очистити дані", use_container_width=True):
+                    st.session_state['edited_prompt_darnytsia'] = ""
+                    st.rerun()
 
-        st.session_state[f'edited_prompt_{st.session_state["prompt_type"]}'] = prompt
+            st.session_state['edited_prompt_darnytsia'] = user_data
+            result_prompt = prompts.PROMPT_DARNYTSIA.replace('{{user_input}}', user_data)
+        else:
+            prompt_map = {
+                'women': (prompts.PROMPT_WOMEN, st.session_state['edited_prompt_women']),
+                'men': (prompts.PROMPT_MEN, st.session_state['edited_prompt_men']),
+                'custom': (prompts.PROMPT_CUSTOM, st.session_state['edited_prompt_custom']),
+            }
+            base_prompt, edited_prompt = prompt_map[st.session_state['prompt_type']]
+            current_prompt_value = edited_prompt if edited_prompt is not None else base_prompt
 
-    return prompt
+            prompt_key = f"prompt_text_area_{st.session_state['prompt_type']}"
+            prompt = st.text_area(
+                "Промпт:",
+                value=current_prompt_value,
+                height=150,
+                placeholder="Опишіть що згенерувати...",
+                key=prompt_key
+            )
+
+            col_reset, _ = st.columns([1, 2])
+            with col_reset:
+                if st.button("↩️ Скинути промпт", use_container_width=True):
+                    st.session_state[f'edited_prompt_{st.session_state["prompt_type"]}'] = base_prompt
+                    st.rerun()
+
+            st.session_state[f'edited_prompt_{st.session_state["prompt_type"]}'] = prompt
+            result_prompt = prompt
+
+    return result_prompt
 
 
 def _render_generate_button(image_service, prompt, uploaded_files):
