@@ -2,7 +2,7 @@
 name = "gemini-hub"
 version = "0.2.0"
 description = "Nano Banana 2 — Image Generator powered by Google Gemini API"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn>=0.34.0",

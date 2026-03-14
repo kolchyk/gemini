@@ -1,0 +1,10 @@
+{
+  "name": "gemini-hub",
+  "private": true,
+  "scripts": {
+    "heroku-postbuild": "cd frontend && npm install && npm run build"
+  },
+  "engines": {
+    "node": "22.x"
+  }
+}

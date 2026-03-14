@@ -1,6 +1,8 @@
 import os
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from backend.routers import generate
 
 app = FastAPI(title="Nano Banana 2 API")
@@ -23,3 +25,8 @@ app.include_router(generate.router, prefix="/api")
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+frontend_dir = Path(__file__).resolve().parent.parent / "frontend" / "out"
+if frontend_dir.is_dir():
+    app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
