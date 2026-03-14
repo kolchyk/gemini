@@ -45,7 +45,7 @@ def test_generate_uses_default_women_prompt(
 
     assert response.status_code == 200
     payload = response.json()
-    result = payload["results"]["gemini-3.1-pro-image-preview"]
+    result = payload["results"]["gemini-3-pro-image-preview"]
 
     assert captured["prompt"] == prompts.PROMPT_WOMEN
     assert result["image_base64"] == base64.b64encode(b"fake-image").decode()
