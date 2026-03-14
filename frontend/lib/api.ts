@@ -136,6 +136,7 @@ function buildGenerateFormData(params: {
   prompt: string;
   modelMode: string;
   aspectRatio: string;
+  resolution: string;
   temperature: number;
   promptType: string;
   referenceImages: File[];
@@ -144,6 +145,7 @@ function buildGenerateFormData(params: {
   formData.append("prompt", params.prompt);
   formData.append("model_mode", params.modelMode);
   formData.append("aspect_ratio", params.aspectRatio);
+  formData.append("resolution", params.resolution);
   formData.append("temperature", params.temperature.toString());
   formData.append("prompt_type", params.promptType);
 
@@ -158,6 +160,7 @@ export async function submitGenerateJob(params: {
   prompt: string;
   modelMode: string;
   aspectRatio: string;
+  resolution: string;
   temperature: number;
   promptType: string;
   referenceImages: File[];

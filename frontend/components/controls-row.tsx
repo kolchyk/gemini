@@ -8,7 +8,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import type { ModelMode, AspectRatio } from "@/lib/types";
+import type { AspectRatio, ImageResolution, ModelMode } from "@/lib/types";
 
 const MODE_HINTS: Record<ModelMode, string> = {
   Flash: "⚡ Швидко (~10с). Підходить для ескізів та ітерацій.",
@@ -19,23 +19,27 @@ const MODE_HINTS: Record<ModelMode, string> = {
 interface ControlsRowProps {
   modelMode: ModelMode;
   aspectRatio: AspectRatio;
+  resolution: ImageResolution;
   temperature: number;
   onModelModeChange: (mode: ModelMode) => void;
   onAspectRatioChange: (ratio: AspectRatio) => void;
+  onResolutionChange: (resolution: ImageResolution) => void;
   onTemperatureChange: (temp: number) => void;
 }
 
 export function ControlsRow({
   modelMode,
   aspectRatio,
+  resolution,
   temperature,
   onModelModeChange,
   onAspectRatioChange,
+  onResolutionChange,
   onTemperatureChange,
 }: ControlsRowProps) {
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_2fr] gap-6">
         <div className="space-y-2">
           <Label>Модель</Label>
           <Select value={modelMode} onValueChange={(v) => onModelModeChange(v as ModelMode)}>
@@ -65,6 +69,22 @@ export function ControlsRow({
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Чіткість</Label>
+          <Select value={resolution} onValueChange={(v) => onResolutionChange(v as ImageResolution)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1K">1K</SelectItem>
+              <SelectItem value="2K">2K</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            1K і 2K передаються напряму в Gemini API.
+          </p>
         </div>
 
         <div className="space-y-3">

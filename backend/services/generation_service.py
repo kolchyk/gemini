@@ -27,6 +27,7 @@ ALLOWED_ASPECT_RATIOS = (
     "8:1",
 )
 ALLOWED_MODEL_MODES = ("Flash", "Pro", "Both")
+ALLOWED_RESOLUTIONS = ("1K", "2K")
 PROMPT_MAP = {
     "custom": prompts.PROMPT_CUSTOM,
     "women": prompts.PROMPT_WOMEN,
@@ -54,6 +55,7 @@ class GenerationRequest:
     prompt: str
     model_mode: str
     aspect_ratio: str
+    resolution: str
     temperature: float
     prompt_type: str
     reference_images: tuple[ReferenceImage, ...]
@@ -84,6 +86,7 @@ def validate_generation_request(
     prompt: str,
     model_mode: str,
     aspect_ratio: str,
+    resolution: str,
     temperature: float,
     prompt_type: str,
     reference_images: tuple[ReferenceImage, ...],
@@ -99,10 +102,14 @@ def validate_generation_request(
     if model_mode not in ALLOWED_MODEL_MODES:
         raise ValueError(f"Invalid model mode: {model_mode}")
 
+    if resolution not in ALLOWED_RESOLUTIONS:
+        raise ValueError(f"Invalid resolution: {resolution}")
+
     return GenerationRequest(
         prompt=final_prompt,
         model_mode=model_mode,
         aspect_ratio=aspect_ratio,
+        resolution=resolution,
         temperature=temperature,
         prompt_type=prompt_type,
         reference_images=reference_images,
@@ -124,7 +131,6 @@ def execute_generation(request: GenerationRequest) -> dict[str, object]:
         target_models = [flash_model, pro_model]
 
     image_service = ImageService()
-    resolution = settings.IMAGE_DEFAULT_RESOLUTION
     thinking_level = settings.IMAGE_DEFAULT_THINKING_LEVEL
 
     def generate_with_model(model_name: str) -> tuple[str, dict[str, object]]:
@@ -135,7 +141,7 @@ def execute_generation(request: GenerationRequest) -> dict[str, object]:
             prompt=request.prompt,
             aspect_ratio=request.aspect_ratio,
             person_images=file_objects if file_objects else None,
-            resolution=resolution,
+            resolution=request.resolution,
             temperature=request.temperature,
             model=model_name,
             thinking_level=model_thinking,

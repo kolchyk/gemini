@@ -1,5 +1,6 @@
 export type ModelMode = "Flash" | "Pro" | "Both";
 export type AspectRatio = "1:1" | "16:9" | "9:16" | "4:3" | "3:4" | "2:3" | "3:2" | "4:5" | "5:4" | "21:9" | "1:4" | "4:1" | "1:8" | "8:1";
+export type ImageResolution = "1K" | "2K";
 export type PromptType = "custom" | "women" | "men" | "darnytsia";
 
 export interface GenerationResult {
@@ -38,6 +39,7 @@ export interface PromptsResponse {
 export interface GenerationState {
   modelMode: ModelMode;
   aspectRatio: AspectRatio;
+  resolution: ImageResolution;
   temperature: number;
   promptType: PromptType;
   prompt: string;

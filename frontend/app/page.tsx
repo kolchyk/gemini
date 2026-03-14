@@ -10,12 +10,13 @@ import { PromptSection } from "@/components/prompt-section";
 import { Button } from "@/components/ui/button";
 import { ApiError, getGenerateJobStatus, getPrompts, submitGenerateJob } from "@/lib/api";
 import type {
+  AspectRatio,
   GenerateJobStatusResponse,
   GenerationJobStatus,
-  ModelMode,
-  AspectRatio,
-  PromptType,
   GenerationResult,
+  ImageResolution,
+  ModelMode,
+  PromptType,
   PromptsResponse,
 } from "@/lib/types";
 
@@ -26,6 +27,7 @@ const ResultSection = dynamic(
 export default function Home() {
   const [modelMode, setModelMode] = useState<ModelMode>("Flash");
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("16:9");
+  const [resolution, setResolution] = useState<ImageResolution>("1K");
   const [temperature, setTemperature] = useState(1.0);
   const [promptType, setPromptType] = useState<PromptType>("custom");
   const [prompt, setPrompt] = useState("");
@@ -165,6 +167,7 @@ export default function Home() {
         prompt,
         modelMode,
         aspectRatio,
+        resolution,
         temperature,
         promptType,
         referenceImages: referenceFiles,
@@ -236,9 +239,11 @@ export default function Home() {
         <ControlsRow
           modelMode={modelMode}
           aspectRatio={aspectRatio}
+          resolution={resolution}
           temperature={temperature}
           onModelModeChange={setModelMode}
           onAspectRatioChange={setAspectRatio}
+          onResolutionChange={setResolution}
           onTemperatureChange={setTemperature}
         />
 

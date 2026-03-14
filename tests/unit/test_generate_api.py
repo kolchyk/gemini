@@ -230,6 +230,39 @@ def test_generate_returns_partial_results_when_one_model_fails(
     assert "pro failed" in results["gemini-3-pro-image-preview"]["error"]
 
 
+def test_generate_forwards_selected_resolution(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pass the chosen native resolution through the API into the image service."""
+    captured: dict[str, str] = {}
+
+    class FakeImageService:
+        def generate_image(self, *, resolution: str, **_: object) -> dict[str, object]:
+            captured["resolution"] = resolution
+            return {
+                "image_bytes": b"fake-image",
+                "text_output": "ok",
+            }
+
+    monkeypatch.setattr("backend.services.generation_service.ImageService", FakeImageService)
+
+    response = client.post(
+        "/api/generate",
+        data={
+            "prompt": "Create a portrait",
+            "model_mode": "Pro",
+            "aspect_ratio": "1:1",
+            "resolution": "1K",
+            "temperature": "1",
+            "prompt_type": "custom",
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured["resolution"] == "1K"
+
+
 def test_generate_requires_custom_prompt(client: TestClient) -> None:
     """Reject custom mode when no prompt text was provided."""
     response = client.post(
