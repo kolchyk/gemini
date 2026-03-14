@@ -1,6 +1,11 @@
-import { GenerateResponse, PromptsResponse } from "./types";
+import {
+  GenerateJobStatusResponse,
+  GenerateJobSubmitResponse,
+  PromptsResponse,
+} from "./types";
 
 const PROMPTS_TIMEOUT_MS = 5000;
+const JOB_STATUS_TIMEOUT_MS = 10000;
 
 const FALLBACK_PROMPTS: PromptsResponse = {
   custom:
@@ -127,14 +132,14 @@ async function readErrorDetail(res: Response): Promise<unknown> {
   return text || null;
 }
 
-export async function generateImage(params: {
+function buildGenerateFormData(params: {
   prompt: string;
   modelMode: string;
   aspectRatio: string;
   temperature: number;
   promptType: string;
   referenceImages: File[];
-}): Promise<GenerateResponse> {
+}): FormData {
   const formData = new FormData();
   formData.append("prompt", params.prompt);
   formData.append("model_mode", params.modelMode);
@@ -146,15 +151,47 @@ export async function generateImage(params: {
     formData.append("reference_images", file);
   }
 
-  const res = await fetch(getApiUrl("/api/generate"), {
+  return formData;
+}
+
+export async function submitGenerateJob(params: {
+  prompt: string;
+  modelMode: string;
+  aspectRatio: string;
+  temperature: number;
+  promptType: string;
+  referenceImages: File[];
+}): Promise<GenerateJobSubmitResponse> {
+  const res = await fetch(getApiUrl("/api/generate/submit"), {
     method: "POST",
-    body: formData,
+    body: buildGenerateFormData(params),
   });
 
   if (!res.ok) {
     const detail = await readErrorDetail(res);
     throw new ApiError(
       typeof detail === "string" && detail ? detail : `HTTP ${res.status}`,
+      res.status,
+      detail
+    );
+  }
+
+  return res.json();
+}
+
+export async function getGenerateJobStatus(
+  jobId: string
+): Promise<GenerateJobStatusResponse> {
+  const res = await fetchWithTimeout(
+    getApiUrl(`/api/generate/status/${jobId}`),
+    undefined,
+    JOB_STATUS_TIMEOUT_MS
+  );
+
+  if (!res.ok) {
+    const detail = await readErrorDetail(res);
+    throw new ApiError(
+      typeof detail === "string" && detail ? detail : `Failed to fetch job status: ${res.status}`,
       res.status,
       detail
     );

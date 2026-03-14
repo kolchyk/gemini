@@ -6,6 +6,8 @@ from fastapi.testclient import TestClient
 
 from backend.config import prompts
 from backend.main import app
+from backend.services.generation_jobs import GenerationJob, InMemoryGenerationJobStore
+from backend.services.generation_service import GenerationExecutionError
 
 
 @pytest.fixture
@@ -33,6 +35,27 @@ def _make_fake_image_service(
     return FakeImageService
 
 
+@pytest.fixture(autouse=True)
+def clear_job_store() -> Iterator[None]:
+    """Reset singleton in-memory jobs so tests never leak state."""
+    from backend.services import generation_jobs
+
+    generation_jobs._job_store._jobs.clear()
+    yield
+    generation_jobs._job_store._jobs.clear()
+
+
+def _run_jobs_immediately(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Execute background jobs inline to keep API tests deterministic."""
+    from backend.services import generation_jobs
+
+    monkeypatch.setattr(
+        generation_jobs._job_executor,
+        "submit",
+        lambda fn, *args, **kwargs: fn(*args, **kwargs),
+    )
+
+
 def test_generate_uses_default_women_prompt(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
@@ -40,7 +63,7 @@ def test_generate_uses_default_women_prompt(
     """Ensure the API can fill the default women prompt server-side."""
     captured: dict[str, str] = {}
     monkeypatch.setattr(
-        "backend.routers.generate.ImageService",
+        "backend.services.generation_service.ImageService",
         _make_fake_image_service(captured),
     )
 
@@ -72,7 +95,7 @@ def test_generate_uses_default_men_prompt(
     """Ensure the API can fill the default men prompt server-side."""
     captured: dict[str, str] = {}
     monkeypatch.setattr(
-        "backend.routers.generate.ImageService",
+        "backend.services.generation_service.ImageService",
         _make_fake_image_service(captured, image_bytes=b"fake-image-men"),
     )
 
@@ -118,7 +141,7 @@ def test_generate_returns_images_for_both_models(
                 "text_output": f"generated-by-{model}",
             }
 
-    monkeypatch.setattr("backend.routers.generate.ImageService", FakeImageService)
+    monkeypatch.setattr("backend.services.generation_service.ImageService", FakeImageService)
 
     response = client.post(
         "/api/generate",
@@ -175,11 +198,7 @@ def test_generate_returns_partial_results_when_one_model_fails(
                 "text_output": "flash-ok",
             }
 
-    monkeypatch.setattr("backend.routers.generate.ImageService", FakeImageService)
-    monkeypatch.setattr(
-        "backend.routers.generate.format_error_with_retry",
-        lambda error, _: f"formatted: {error}",
-    )
+    monkeypatch.setattr("backend.services.generation_service.ImageService", FakeImageService)
 
     response = client.post(
         "/api/generate",
@@ -208,7 +227,7 @@ def test_generate_returns_partial_results_when_one_model_fails(
     assert results["gemini-3.1-flash-image-preview"]["error"] is None
     assert results["gemini-3-pro-image-preview"]["image_base64"] is None
     assert results["gemini-3-pro-image-preview"]["text_output"] == ""
-    assert results["gemini-3-pro-image-preview"]["error"] == "formatted: pro failed"
+    assert "pro failed" in results["gemini-3-pro-image-preview"]["error"]
 
 
 def test_generate_requires_custom_prompt(client: TestClient) -> None:
@@ -235,3 +254,118 @@ def test_prompts_endpoint_returns_defaults(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json()["women"] == prompts.PROMPT_WOMEN
     assert response.json()["men"] == prompts.PROMPT_MEN
+
+
+def test_submit_generate_job_returns_completed_result(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Submit endpoint should create a job and expose its final payload via polling."""
+    from backend.services import generation_jobs
+
+    _run_jobs_immediately(monkeypatch)
+    monkeypatch.setattr(
+        generation_jobs,
+        "execute_generation",
+        lambda request: {
+            "results": {
+                "gemini-3-pro-image-preview": {
+                    "image_base64": "abc",
+                    "text_output": "done",
+                    "error": None,
+                }
+            },
+            "fallback_used": False,
+        },
+    )
+
+    submission = client.post(
+        "/api/generate/submit",
+        data={
+            "prompt": "Create a portrait",
+            "model_mode": "Pro",
+            "aspect_ratio": "1:1",
+            "temperature": "1",
+            "prompt_type": "custom",
+        },
+    )
+
+    assert submission.status_code == 200
+    payload = submission.json()
+    assert payload["status"] == "queued"
+
+    status_response = client.get(f"/api/generate/status/{payload['job_id']}")
+    assert status_response.status_code == 200
+    assert status_response.json() == {
+        "job_id": payload["job_id"],
+        "status": "completed",
+        "results": {
+            "gemini-3-pro-image-preview": {
+                "image_base64": "abc",
+                "text_output": "done",
+                "error": None,
+            }
+        },
+        "fallback_used": False,
+    }
+
+
+def test_submit_generate_job_returns_failed_status(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Polling should expose background job failures without hanging the request."""
+    from backend.services import generation_jobs
+
+    _run_jobs_immediately(monkeypatch)
+
+    def raise_failure(_: object) -> dict[str, object]:
+        raise GenerationExecutionError("boom")
+
+    monkeypatch.setattr(generation_jobs, "execute_generation", raise_failure)
+
+    submission = client.post(
+        "/api/generate/submit",
+        data={
+            "prompt": "Create a portrait",
+            "model_mode": "Pro",
+            "aspect_ratio": "1:1",
+            "temperature": "1",
+            "prompt_type": "custom",
+        },
+    )
+
+    assert submission.status_code == 200
+    job_id = submission.json()["job_id"]
+
+    status_response = client.get(f"/api/generate/status/{job_id}")
+    assert status_response.status_code == 200
+    assert status_response.json() == {
+        "job_id": job_id,
+        "status": "failed",
+        "error": "boom",
+    }
+
+
+def test_generate_status_returns_404_for_unknown_job(client: TestClient) -> None:
+    """Reject polling for jobs that never existed or already expired."""
+    response = client.get("/api/generate/status/missing")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Job not found."}
+
+
+def test_job_store_prunes_expired_jobs(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cleanup should drop stale finished jobs so the in-memory store stays bounded."""
+    store = InMemoryGenerationJobStore(ttl_seconds=10)
+    store._jobs["expired"] = GenerationJob(
+        job_id="expired",
+        status="completed",
+        created_at=0.0,
+        updated_at=0.0,
+        result={"results": {}},
+    )
+
+    monkeypatch.setattr("backend.services.generation_jobs.time.time", lambda: 20.0)
+
+    assert store.get_job("expired") is None

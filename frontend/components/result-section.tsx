@@ -10,7 +10,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { GenerationResult } from "@/lib/types";
+import type { GenerationJobStatus, GenerationResult } from "@/lib/types";
 
 const MODEL_DISPLAY_NAMES: Record<string, string> = {
   "gemini-3.1-flash-image-preview": "⚡ Flash",
@@ -20,6 +20,7 @@ const MODEL_DISPLAY_NAMES: Record<string, string> = {
 interface ResultSectionProps {
   results: Record<string, GenerationResult> | null;
   isGenerating: boolean;
+  jobStatus?: GenerationJobStatus | null;
 }
 
 function downloadImage(base64: string, filename: string) {
@@ -40,6 +41,7 @@ function downloadImage(base64: string, filename: string) {
 export const ResultSection = memo(function ResultSection({
   results,
   isGenerating,
+  jobStatus,
 }: ResultSectionProps) {
   if (isGenerating) {
     return (
@@ -55,7 +57,9 @@ export const ResultSection = memo(function ResultSection({
             </div>
           </div>
           <p className="text-center text-muted-foreground mt-4 animate-pulse">
-            ✨ Генеруємо ваш шедевр...
+            {jobStatus === "queued"
+              ? "⏳ Ставимо задачу в чергу..."
+              : "✨ Генеруємо ваш шедевр..."}
           </p>
         </CardContent>
       </Card>

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 from PIL import Image
@@ -16,7 +17,7 @@ from backend.config import settings
 from backend.services.image_service import ImageService
 
 PROMPT = "man"
-OUTPUT_DIR = Path("test")
+OUTPUT_DIR = Path("test/images")
 
 
 def _image_extension(image_bytes: bytes) -> str:
@@ -28,7 +29,7 @@ def _image_extension(image_bytes: bytes) -> str:
 
 def _save_image(model_name: str, image_bytes: bytes) -> Path:
     """Write the generated image into the requested test output folder."""
-    OUTPUT_DIR.mkdir(exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     file_name = model_name.replace(".", "_").replace("-", "_")
     output_path = OUTPUT_DIR / f"{file_name}.{_image_extension(image_bytes)}"
     output_path.write_bytes(image_bytes)
@@ -38,7 +39,7 @@ def _save_image(model_name: str, image_bytes: bytes) -> Path:
 def main() -> int:
     """Generate one image per configured model and report the result."""
     service = ImageService()
-    OUTPUT_DIR.mkdir(exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     had_errors = False
 
     for model_name in settings.GEMINI_IMAGE_MODELS:
@@ -48,6 +49,7 @@ def main() -> int:
             else None
         )
         try:
+            started_at = perf_counter()
             result: dict[str, Any] = service.generate_image(
                 prompt=PROMPT,
                 aspect_ratio=settings.IMAGE_DEFAULT_ASPECT_RATIO,
@@ -62,7 +64,10 @@ def main() -> int:
                     f"Model returned no image. Text: {result.get('text_output', '')}"
                 )
             output_path = _save_image(model_name, image_bytes)
-            print(f"{model_name}: ok -> {output_path}")
+            elapsed_seconds = perf_counter() - started_at
+            print(
+                f"{model_name}: ok in {elapsed_seconds:.2f}s -> {output_path}"
+            )
         except Exception as error:
             had_errors = True
             print(f"{model_name}: error -> {error}")

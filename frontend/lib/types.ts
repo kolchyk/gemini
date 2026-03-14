@@ -13,6 +13,21 @@ export interface GenerateResponse {
   fallback_used?: boolean;
 }
 
+export type GenerationJobStatus = "queued" | "running" | "completed" | "failed";
+
+export interface GenerateJobSubmitResponse {
+  job_id: string;
+  status: GenerationJobStatus;
+}
+
+export interface GenerateJobStatusResponse {
+  job_id: string;
+  status: GenerationJobStatus;
+  results?: Record<string, GenerationResult>;
+  fallback_used?: boolean;
+  error?: string | null;
+}
+
 export interface PromptsResponse {
   custom: string;
   women: string;

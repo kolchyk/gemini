@@ -8,8 +8,10 @@ import { ControlsRow } from "@/components/controls-row";
 import { ReferenceUpload } from "@/components/reference-upload";
 import { PromptSection } from "@/components/prompt-section";
 import { Button } from "@/components/ui/button";
-import { ApiError, generateImage, getPrompts } from "@/lib/api";
+import { ApiError, getGenerateJobStatus, getPrompts, submitGenerateJob } from "@/lib/api";
 import type {
+  GenerateJobStatusResponse,
+  GenerationJobStatus,
   ModelMode,
   AspectRatio,
   PromptType,
@@ -30,11 +32,13 @@ export default function Home() {
   const [referenceFiles, setReferenceFiles] = useState<File[]>([]);
   const [results, setResults] = useState<Record<string, GenerationResult> | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [jobStatus, setJobStatus] = useState<GenerationJobStatus | null>(null);
   const [defaultPrompts, setDefaultPrompts] = useState<PromptsResponse | null>(null);
   const [isPromptsLoading, setIsPromptsLoading] = useState(false);
   const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
   const retryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const promptsRequestRef = useRef<Promise<PromptsResponse | null> | null>(null);
+  const generationRunRef = useRef(0);
 
   // Sync prompt when defaultPrompts arrive if currently empty
   useEffect(() => {
@@ -121,6 +125,28 @@ export default function Home() {
     }
   });
 
+  const pollGenerationJob = useCallback(
+    async (jobId: string, runId: number): Promise<GenerateJobStatusResponse> => {
+      while (generationRunRef.current === runId) {
+        const response = await getGenerateJobStatus(jobId);
+
+        if (generationRunRef.current !== runId) {
+          throw new Error("Generation was cancelled.");
+        }
+
+        setJobStatus(response.status);
+        if (response.status === "completed" || response.status === "failed") {
+          return response;
+        }
+
+        await new Promise((resolve) => window.setTimeout(resolve, 1500));
+      }
+
+      throw new Error("Generation was cancelled.");
+    },
+    []
+  );
+
   const handleGenerate = async () => {
     if (!prompt.trim()) {
       toast.error("Будь ласка, введіть промпт!");
@@ -128,11 +154,14 @@ export default function Home() {
     }
 
     stopRetryTimer();
+    generationRunRef.current += 1;
+    const runId = generationRunRef.current;
     setIsGenerating(true);
+    setJobStatus("queued");
     setResults(null);
 
     try {
-      const response = await generateImage({
+      const submission = await submitGenerateJob({
         prompt,
         modelMode,
         aspectRatio,
@@ -140,20 +169,28 @@ export default function Home() {
         promptType,
         referenceImages: referenceFiles,
       });
+      setJobStatus(submission.status);
+
+      const response = await pollGenerationJob(submission.job_id, runId);
+      if (response.status === "failed") {
+        throw new Error(response.error || "Генерація завершилася з помилкою.");
+      }
+
+      const responseResults = response.results ?? {};
 
       // Check if all results are errors (no images)
-      const hasAnyImage = Object.values(response.results).some(
+      const hasAnyImage = Object.values(responseResults).some(
         (r) => r.image_base64 !== null
       );
 
       if (!hasAnyImage) {
         // All models failed — start retry countdown
-        setResults(response.results);
+        setResults(responseResults);
         toast.error("Всі моделі повернули помилку. Автоповтор через 30 сек...");
         pendingRetryRef.current = true;
         startRetryTimer();
       } else {
-        setResults(response.results);
+        setResults(responseResults);
         if (response.fallback_used) {
           toast.success("Основна модель недоступна — використано резервну.");
         } else {
@@ -176,7 +213,9 @@ export default function Home() {
       pendingRetryRef.current = true;
       startRetryTimer();
     } finally {
-      setIsGenerating(false);
+      if (generationRunRef.current === runId) {
+        setIsGenerating(false);
+      }
     }
   };
 
@@ -222,7 +261,9 @@ export default function Home() {
             disabled={isGenerating}
           >
             {isGenerating
-              ? "✨ Генеруємо..."
+              ? jobStatus === "queued"
+                ? "⏳ Ставимо задачу в чергу..."
+                : "✨ Генеруємо..."
               : retryCountdown !== null
                 ? `🔄 Автоповтор через ${retryCountdown}с (натисніть для повтору)`
                 : buttonLabel}
@@ -239,7 +280,7 @@ export default function Home() {
           )}
         </div>
 
-        <ResultSection results={results} isGenerating={isGenerating} />
+        <ResultSection results={results} isGenerating={isGenerating} jobStatus={jobStatus} />
       </div>
     </main>
   );
