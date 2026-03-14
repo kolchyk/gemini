@@ -8,7 +8,7 @@ import { ControlsRow } from "@/components/controls-row";
 import { ReferenceUpload } from "@/components/reference-upload";
 import { PromptSection } from "@/components/prompt-section";
 import { Button } from "@/components/ui/button";
-import { generateImage, getPrompts } from "@/lib/api";
+import { ApiError, generateImage, getPrompts } from "@/lib/api";
 import type {
   ModelMode,
   AspectRatio,
@@ -161,6 +161,16 @@ export default function Home() {
         }
       }
     } catch (err) {
+      if (err instanceof ApiError) {
+        console.error("Image generation API error:", {
+          message: err.message,
+          status: err.status,
+          detail: err.detail,
+        });
+      } else {
+        console.error("Image generation failed:", err);
+      }
+
       const message = err instanceof Error ? err.message : "Unknown error";
       toast.error(message);
       pendingRetryRef.current = true;

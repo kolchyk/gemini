@@ -13,7 +13,7 @@ import type { ModelMode, AspectRatio } from "@/lib/types";
 const MODE_HINTS: Record<ModelMode, string> = {
   Flash: "⚡ Швидко (~10с). Підходить для ескізів та ітерацій.",
   Pro: "✨ Вища якість (~30с). Підходить для фінальних зображень.",
-  Both: "🔀 Паралельна генерація — порівняйте результати двох моделей.",
+  Both: "",
 };
 
 interface ControlsRowProps {
@@ -48,7 +48,9 @@ export function ControlsRow({
               <SelectItem value="Both">🔀 Обидві</SelectItem>
             </SelectContent>
           </Select>
-          <p className="text-xs text-muted-foreground">{MODE_HINTS[modelMode]}</p>
+          {MODE_HINTS[modelMode] && (
+            <p className="text-xs text-muted-foreground">{MODE_HINTS[modelMode]}</p>
+          )}
         </div>
 
         <div className="space-y-2">
