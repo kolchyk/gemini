@@ -7,12 +7,6 @@ _MIME_FALLBACK: dict[str, str] = {
     '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
     '.png': 'image/png', '.gif': 'image/gif',
     '.bmp': 'image/bmp', '.webp': 'image/webp',
-    '.pdf': 'application/pdf',
-    '.txt': 'text/plain', '.md': 'text/plain',
-    '.py': 'text/plain', '.js': 'text/plain',
-    '.ts': 'text/plain', '.html': 'text/html',
-    '.css': 'text/css', '.json': 'application/json',
-    '.csv': 'text/csv', '.xml': 'application/xml',
 }
 
 
