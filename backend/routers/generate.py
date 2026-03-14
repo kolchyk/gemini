@@ -3,8 +3,6 @@ import base64
 import logging
 import concurrent.futures
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from typing import Optional
-
 from backend.services.image_service import ImageService
 from backend.services.error_utils import format_error_with_retry
 from backend.config import settings, prompts
@@ -21,6 +19,26 @@ PROMPT_MAP = {
 }
 
 
+def _build_final_prompt(prompt: str, prompt_type: str) -> str:
+    """Fill in server-side defaults when a prompt template is selected."""
+    stripped_prompt = prompt.strip()
+
+    if prompt_type == "darnytsia":
+        if not stripped_prompt:
+            return ""
+        if "Darnytsia Presentation Expert" in stripped_prompt:
+            return stripped_prompt
+        return prompts.PROMPT_DARNYTSIA.replace("{{user_input}}", stripped_prompt)
+
+    if stripped_prompt:
+        return stripped_prompt
+
+    if prompt_type in ("women", "men"):
+        return PROMPT_MAP[prompt_type]
+
+    return ""
+
+
 @router.get("/prompts")
 async def get_prompts():
     return {
@@ -33,14 +51,15 @@ async def get_prompts():
 
 @router.post("/generate")
 async def generate_image(
-    prompt: str = Form(...),
+    prompt: str = Form(""),
     model_mode: str = Form("Pro"),
     aspect_ratio: str = Form("1:1"),
     temperature: float = Form(1.0),
     prompt_type: str = Form("custom"),
     reference_images: list[UploadFile] = File(default=[]),
 ):
-    if not prompt.strip():
+    final_prompt = _build_final_prompt(prompt, prompt_type)
+    if not final_prompt:
         raise HTTPException(status_code=400, detail="Prompt is required.")
 
     if aspect_ratio not in ("1:1", "16:9", "9:16", "4:3", "3:4", "2:3", "3:2", "4:5", "5:4", "21:9", "1:4", "4:1", "1:8", "8:1"):
@@ -48,17 +67,6 @@ async def generate_image(
 
     if model_mode not in ("Flash", "Pro", "Both"):
         raise HTTPException(status_code=400, detail=f"Invalid model mode: {model_mode}")
-
-    # Build the final prompt
-    if prompt_type == "darnytsia":
-        # If the user has already provided a prompt that looks like the full template, use it as is
-        # Otherwise, wrap their input with the template
-        if "Darnytsia Presentation Expert" in prompt:
-            final_prompt = prompt
-        else:
-            final_prompt = prompts.PROMPT_DARNYTSIA.replace("{{user_input}}", prompt)
-    else:
-        final_prompt = prompt
 
     # Prepare uploaded files as BytesIO with .name attribute
     file_objects = []

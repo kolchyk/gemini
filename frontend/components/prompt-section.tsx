@@ -15,7 +15,8 @@ interface PromptSectionProps {
   promptType: PromptType;
   prompt: string;
   defaultPrompts: Record<PromptType, string> | null;
-  onPromptTypeChange: (type: PromptType) => void;
+  isLoadingPrompts: boolean;
+  onPromptTypeChange: (type: PromptType) => void | Promise<void>;
   onPromptChange: (prompt: string) => void;
 }
 
@@ -30,6 +31,7 @@ export function PromptSection({
   promptType,
   prompt,
   defaultPrompts,
+  isLoadingPrompts,
   onPromptTypeChange,
   onPromptChange,
 }: PromptSectionProps) {
@@ -56,12 +58,16 @@ export function PromptSection({
               variant={promptType === value ? "default" : "outline"}
               size="sm"
               onClick={() => onPromptTypeChange(value)}
-              disabled={!defaultPrompts && value !== "custom"}
+              disabled={isLoadingPrompts && value !== "custom"}
             >
               {label}
             </Button>
           ))}
-          {!defaultPrompts && <span className="text-xs text-muted-foreground animate-pulse ml-2">Завантаження шаблонів...</span>}
+          {isLoadingPrompts && (
+            <span className="text-xs text-muted-foreground animate-pulse ml-2">
+              Завантаження шаблонів...
+            </span>
+          )}
         </div>
 
         {promptType !== "custom" && (

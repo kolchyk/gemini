@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,7 +36,10 @@ function downloadImage(base64: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-export function ResultSection({ results, isGenerating }: ResultSectionProps) {
+export const ResultSection = memo(function ResultSection({
+  results,
+  isGenerating,
+}: ResultSectionProps) {
   if (isGenerating) {
     return (
       <Card>
@@ -128,4 +132,4 @@ export function ResultSection({ results, isGenerating }: ResultSectionProps) {
       </CardContent>
     </Card>
   );
-}
+});

@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 
 interface ReferenceUploadProps {
   files: File[];
@@ -11,6 +10,20 @@ interface ReferenceUploadProps {
 
 export function ReferenceUpload({ files, onFilesChange }: ReferenceUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const previews = useMemo(
+    () =>
+      files.map((file) => ({
+        file,
+        url: URL.createObjectURL(file),
+      })),
+    [files]
+  );
+
+  useEffect(() => {
+    return () => {
+      previews.forEach(({ url }) => URL.revokeObjectURL(url));
+    };
+  }, [previews]);
 
   const handleFiles = useCallback(
     (newFiles: FileList | null) => {
@@ -65,10 +78,10 @@ export function ReferenceUpload({ files, onFilesChange }: ReferenceUploadProps) 
 
         {files.length > 0 && (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 mt-4">
-            {files.map((file, idx) => (
-              <div key={idx} className="relative group">
+            {previews.map(({ file, url }, idx) => (
+              <div key={`${file.name}-${file.lastModified}-${idx}`} className="relative group">
                 <img
-                  src={URL.createObjectURL(file)}
+                  src={url}
                   alt={`Реф. ${idx + 1}`}
                   className="w-full aspect-square object-cover rounded-md border"
                 />

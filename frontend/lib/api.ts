@@ -1,6 +1,22 @@
 import { GenerateResponse, PromptsResponse } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+function getApiBaseUrl(): string {
+  const configuredUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (configuredUrl) {
+    return configuredUrl;
+  }
+
+  // In local Next.js dev, the frontend runs on :3000 while FastAPI usually runs on :8000.
+  if (typeof window !== "undefined" && window.location.port === "3000") {
+    return "http://127.0.0.1:8000";
+  }
+
+  return "";
+}
+
+function getApiUrl(path: string): string {
+  return `${getApiBaseUrl()}${path}`;
+}
 
 export async function generateImage(params: {
   prompt: string;
@@ -21,7 +37,7 @@ export async function generateImage(params: {
     formData.append("reference_images", file);
   }
 
-  const res = await fetch(`${API_URL}/api/generate`, {
+  const res = await fetch(getApiUrl("/api/generate"), {
     method: "POST",
     body: formData,
   });
@@ -35,7 +51,7 @@ export async function generateImage(params: {
 }
 
 export async function getPrompts(): Promise<PromptsResponse> {
-  const res = await fetch(`${API_URL}/api/prompts`);
+  const res = await fetch(getApiUrl("/api/prompts"));
   if (!res.ok) {
     throw new Error(`Failed to fetch prompts: ${res.status}`);
   }

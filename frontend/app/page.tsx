@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import { Header } from "@/components/header";
 import { ControlsRow } from "@/components/controls-row";
 import { ReferenceUpload } from "@/components/reference-upload";
 import { PromptSection } from "@/components/prompt-section";
-import { ResultSection } from "@/components/result-section";
 import { Button } from "@/components/ui/button";
 import { generateImage, getPrompts } from "@/lib/api";
 import type {
@@ -16,6 +16,10 @@ import type {
   GenerationResult,
   PromptsResponse,
 } from "@/lib/types";
+
+const ResultSection = dynamic(
+  () => import("@/components/result-section").then((mod) => mod.ResultSection)
+);
 
 export default function Home() {
   const [modelMode, setModelMode] = useState<ModelMode>("Flash");
@@ -27,19 +31,10 @@ export default function Home() {
   const [results, setResults] = useState<Record<string, GenerationResult> | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [defaultPrompts, setDefaultPrompts] = useState<PromptsResponse | null>(null);
+  const [isPromptsLoading, setIsPromptsLoading] = useState(false);
   const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
   const retryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    getPrompts()
-      .then((prompts) => {
-        setDefaultPrompts(prompts);
-      })
-      .catch((err) => {
-        console.error("Failed to load prompts:", err);
-        toast.error("Не вдалося завантажити шаблони промптів");
-      });
-  }, []);
+  const promptsRequestRef = useRef<Promise<PromptsResponse | null> | null>(null);
 
   // Sync prompt when defaultPrompts arrive if currently empty
   useEffect(() => {
@@ -50,18 +45,49 @@ export default function Home() {
     }
   }, [defaultPrompts, promptType, prompt]);
 
+  const ensurePromptsLoaded = useCallback(async () => {
+    if (defaultPrompts) {
+      return defaultPrompts;
+    }
+
+    if (promptsRequestRef.current) {
+      return promptsRequestRef.current;
+    }
+
+    setIsPromptsLoading(true);
+    promptsRequestRef.current = getPrompts()
+      .then((prompts) => {
+        setDefaultPrompts(prompts);
+        return prompts;
+      })
+      .catch((err) => {
+        console.error("Failed to load prompts:", err);
+        toast.error("Не вдалося завантажити шаблони промптів");
+        return null;
+      })
+      .finally(() => {
+        promptsRequestRef.current = null;
+        setIsPromptsLoading(false);
+      });
+
+    return promptsRequestRef.current;
+  }, [defaultPrompts]);
+
   const handlePromptTypeChange = useCallback(
-    (type: PromptType) => {
-      setPromptType(type);
-      if (defaultPrompts) {
-        if (type === "custom") {
-          setPrompt("");
-        } else {
-          setPrompt(defaultPrompts[type]);
-        }
+    async (type: PromptType) => {
+      if (type === "custom") {
+        setPromptType(type);
+        setPrompt("");
+        return;
+      }
+
+      const prompts = defaultPrompts ?? (await ensurePromptsLoaded());
+      if (prompts) {
+        setPromptType(type);
+        setPrompt(prompts[type]);
       }
     },
-    [defaultPrompts]
+    [defaultPrompts, ensurePromptsLoaded]
   );
 
   const stopRetryTimer = useCallback(() => {
@@ -173,6 +199,7 @@ export default function Home() {
           promptType={promptType}
           prompt={prompt}
           defaultPrompts={defaultPrompts}
+          isLoadingPrompts={isPromptsLoading}
           onPromptTypeChange={handlePromptTypeChange}
           onPromptChange={setPrompt}
         />
