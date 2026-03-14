@@ -1,6 +1,7 @@
 {
   "name": "gemini-hub",
   "private": true,
+  "cacheDirectories": ["frontend/node_modules"],
   "scripts": {
     "heroku-postbuild": "cd frontend && npm install --include=dev && npm run build"
   },
