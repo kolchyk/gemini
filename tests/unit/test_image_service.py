@@ -1,56 +1,60 @@
-import unittest
 import base64
-from unittest.mock import MagicMock, patch
-from services.image_service import ImageService
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
-class TestImageService(unittest.TestCase):
-    @patch('services.image_service.get_gemini_client')
-    @patch('services.image_service.telegram_service')
-    def test_generate_image_basic(self, mock_telegram_service, mock_get_gemini_client):
-        # Setup mock client
-        mock_client = MagicMock()
-        mock_get_gemini_client.return_value = mock_client
-        
-        # Mock generate_content_stream response (it's a generator)
-        mock_chunk = MagicMock()
-        mock_part_image = MagicMock()
-        mock_part_text = MagicMock()
-        mock_chunk.parts = [mock_part_image, mock_part_text]
-        
-        # Setup image part
-        mock_image_data_b64 = base64.b64encode(b"mock_image_bytes").decode('utf-8')
-        mock_part_image.inline_data.data = mock_image_data_b64
-        mock_part_image.text = None
-        
-        # Setup text part
-        mock_part_text.inline_data = None
-        mock_part_text.text = "Mock response text"
-        
-        mock_client.models.generate_content_stream.return_value = [mock_chunk]
-        
-        # Initialize service
-        service = ImageService()
-        
-        # Test generate_image
-        result = service.generate_image(prompt="test prompt")
-        
-        # Assertions
-        self.assertIn('image_bytes', result)
-        self.assertEqual(result['image_bytes'], b"mock_image_bytes")
-        self.assertIn('text_output', result)
-        self.assertEqual(result['text_output'], "Mock response text")
-        
-        # Verify calls
-        mock_client.models.generate_content_stream.assert_called_once()
-        mock_telegram_service.sync_send_image_log.assert_called_once()
+import pytest
 
-    def test_generate_image_empty_prompt(self):
-        service = ImageService() # Will trigger get_gemini_client in __init__ but we'll mock it if needed
-        # Actually, let's mock get_gemini_client here as well or just let it fail if it's called
-        with patch('services.image_service.get_gemini_client'):
-            service = ImageService()
-            with self.assertRaises(ValueError):
-                service.generate_image(prompt="")
+from backend.config import settings
+from backend.services.image_service import ImageService
 
-if __name__ == '__main__':
-    unittest.main()
+
+def test_generate_image_returns_image_and_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ensure the service decodes image bytes and concatenates text chunks."""
+    mock_client = MagicMock()
+    mock_client.models.generate_content_stream.return_value = [
+        SimpleNamespace(
+            parts=[
+                SimpleNamespace(
+                    inline_data=SimpleNamespace(
+                        data=base64.b64encode(b"mock_image_bytes").decode("utf-8")
+                    ),
+                    text=None,
+                ),
+                SimpleNamespace(
+                    inline_data=None,
+                    text="Mock response text",
+                ),
+            ]
+        )
+    ]
+    monkeypatch.setattr(
+        "backend.services.image_service.get_gemini_client",
+        lambda: mock_client,
+    )
+
+    service = ImageService()
+    result = service.generate_image(prompt="test prompt")
+
+    assert result["image_bytes"] == b"mock_image_bytes"
+    assert result["text_output"] == "Mock response text"
+    mock_client.models.generate_content_stream.assert_called_once()
+    assert mock_client.models.generate_content_stream.call_args.kwargs["model"] == (
+        settings.IMAGE_MODEL
+    )
+
+
+def test_generate_image_rejects_empty_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Prevent requests that would hit the Gemini API without prompt text."""
+    monkeypatch.setattr(
+        "backend.services.image_service.get_gemini_client",
+        lambda: MagicMock(),
+    )
+
+    service = ImageService()
+
+    with pytest.raises(ValueError, match="Prompt is required for image generation."):
+        service.generate_image(prompt="")

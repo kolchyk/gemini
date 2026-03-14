@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -80,9 +81,12 @@ export function ReferenceUpload({ files, onFilesChange }: ReferenceUploadProps) 
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 mt-4">
             {previews.map(({ file, url }, idx) => (
               <div key={`${file.name}-${file.lastModified}-${idx}`} className="relative group">
-                <img
+                <Image
                   src={url}
                   alt={`Реф. ${idx + 1}`}
+                  width={256}
+                  height={256}
+                  unoptimized
                   className="w-full aspect-square object-cover rounded-md border"
                 />
                 <button
