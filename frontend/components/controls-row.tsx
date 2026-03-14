@@ -58,7 +58,7 @@ export function ControlsRow({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(["1:1", "16:9", "9:16", "4:3", "3:4"] as AspectRatio[]).map((r) => (
+              {(["1:1", "16:9", "9:16", "4:3", "3:4", "2:3", "3:2", "4:5", "5:4", "21:9", "1:4", "4:1", "1:8", "8:1"] as AspectRatio[]).map((r) => (
                 <SelectItem key={r} value={r}>{r}</SelectItem>
               ))}
             </SelectContent>

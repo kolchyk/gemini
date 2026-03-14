@@ -43,7 +43,7 @@ async def generate_image(
     if not prompt.strip():
         raise HTTPException(status_code=400, detail="Prompt is required.")
 
-    if aspect_ratio not in ("1:1", "16:9", "9:16", "4:3", "3:4"):
+    if aspect_ratio not in ("1:1", "16:9", "9:16", "4:3", "3:4", "2:3", "3:2", "4:5", "5:4", "21:9", "1:4", "4:1", "1:8", "8:1"):
         raise HTTPException(status_code=400, detail=f"Invalid aspect ratio: {aspect_ratio}")
 
     if model_mode not in ("Flash", "Pro", "Both"):
@@ -51,7 +51,12 @@ async def generate_image(
 
     # Build the final prompt
     if prompt_type == "darnytsia":
-        final_prompt = prompts.PROMPT_DARNYTSIA.replace("{{user_input}}", prompt)
+        # If the user has already provided a prompt that looks like the full template, use it as is
+        # Otherwise, wrap their input with the template
+        if "Darnytsia Presentation Expert" in prompt:
+            final_prompt = prompt
+        else:
+            final_prompt = prompts.PROMPT_DARNYTSIA.replace("{{user_input}}", prompt)
     else:
         final_prompt = prompt
 

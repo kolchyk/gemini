@@ -37,14 +37,24 @@ export default function Home() {
       })
       .catch((err) => {
         console.error("Failed to load prompts:", err);
+        toast.error("Не вдалося завантажити шаблони промптів");
       });
   }, []);
+
+  // Sync prompt when defaultPrompts arrive if currently empty
+  useEffect(() => {
+    if (defaultPrompts && prompt === "") {
+      if (promptType !== "custom") {
+        setPrompt(defaultPrompts[promptType]);
+      }
+    }
+  }, [defaultPrompts, promptType, prompt]);
 
   const handlePromptTypeChange = useCallback(
     (type: PromptType) => {
       setPromptType(type);
       if (defaultPrompts) {
-        if (type === "darnytsia" || type === "custom") {
+        if (type === "custom") {
           setPrompt("");
         } else {
           setPrompt(defaultPrompts[type]);

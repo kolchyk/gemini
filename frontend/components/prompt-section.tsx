@@ -35,7 +35,7 @@ export function PromptSection({
 }: PromptSectionProps) {
   const handleReset = () => {
     if (defaultPrompts) {
-      if (promptType === "darnytsia" || promptType === "custom") {
+      if (promptType === "custom") {
         onPromptChange("");
       } else {
         onPromptChange(defaultPrompts[promptType]);
@@ -56,27 +56,30 @@ export function PromptSection({
               variant={promptType === value ? "default" : "outline"}
               size="sm"
               onClick={() => onPromptTypeChange(value)}
+              disabled={!defaultPrompts && value !== "custom"}
             >
               {label}
             </Button>
           ))}
+          {!defaultPrompts && <span className="text-xs text-muted-foreground animate-pulse ml-2">Завантаження шаблонів...</span>}
         </div>
 
-        {promptType === "darnytsia" && (
+        {promptType !== "custom" && (
           <Collapsible>
             <CollapsibleTrigger className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
-              📋 Системна конфігурація (Darnytsia Corporate Identity)
+              📋 Системна конфігурація {promptType === "darnytsia" ? "(Darnytsia Corporate Identity)" : `(${PROMPT_TYPES.find(p => p.value === promptType)?.label})`}
             </CollapsibleTrigger>
             <CollapsibleContent>
               <Alert className="mt-2">
                 <AlertDescription className="text-xs">
-                  Ця інструкція зашита в систему і застосовується до ваших даних
-                  автоматично.
+                  {promptType === "darnytsia" 
+                    ? "Ця інструкція зашита в систему і застосовується до ваших даних автоматично."
+                    : "Цей шаблон використовується як основа для генерації."}
                 </AlertDescription>
               </Alert>
-              {defaultPrompts?.darnytsia && (
-                <pre className="mt-2 p-3 bg-muted rounded-md text-xs overflow-auto max-h-60">
-                  {defaultPrompts.darnytsia}
+              {defaultPrompts?.[promptType] && (
+                <pre className="mt-2 p-3 bg-muted rounded-md text-xs overflow-auto max-h-60 whitespace-pre-wrap">
+                  {defaultPrompts[promptType]}
                 </pre>
               )}
             </CollapsibleContent>
@@ -88,8 +91,8 @@ export function PromptSection({
           onChange={(e) => onPromptChange(e.target.value)}
           placeholder={
             promptType === "darnytsia"
-              ? "Введіть ваші дані для слайду..."
-              : "Опишіть що згенерувати..."
+              ? "Введіть ваші дані замість {{user_input}}..."
+              : defaultPrompts?.custom || "Опишіть що згенерувати..."
           }
           rows={6}
         />
